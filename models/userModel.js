@@ -1,39 +1,54 @@
 // models/itemModel.js
-const pool = require('../config/db');
+const db = require("../config/db");
 
-const getAllUsers = (callback) => {
-  pool.query('SELECT * FROM users', (error, results) => {
-    if (error) throw error;
-    callback(results);
-  });
+const checkDuplicateField = async (field, value, table) => {
+}
+
+const getAllUsers = async (callback) => {
+
+  try {
+    const users = await db('users');
+    callback(users);
+  } catch (e) {
+    console.log(e);
+  }
 };
 
-const getUserById = (userId, callback) => {
-  pool.query('SELECT * FROM users WHERE id = ?', [userId], (error, results) => {
-    if (error) throw error;
-    callback(results[0]);
-  });
+const getUserById = async (userId, callback) => {
+
+  try {
+    const userById = await db('users').where('id', userId);
+    callback(userById);
+  } catch (e) {
+    console.log(e);
+  }
 };
 
-const createUser = (userData, callback) => {
-  pool.query('INSERT INTO users SET ?', [userData], (error, results) => {
-    if (error) throw error;
-    callback(results.insertId);
+const createUser = async (userData, callback) => {
+  const query = insert("users").given({
+
   });
+
+  try {
+    // const result = await query.execute(pool);
+    callback(result);
+  } catch (e) {
+    console.log(e);
+  }
 };
 
 const updateUser = (userId, userData, callback) => {
-  pool.query('UPDATE users SET ? WHERE id = ?', [userData, userId], (error) => {
-    if (error) throw error;
-    callback();
-  });
+  // pool.query("UPDATE users SET ? WHERE id = ?", [userData, userId], (error) => {
+  //   if (error) throw error;
+  //   callback();
+  // });
 };
 
 const deleteUser = (userId, callback) => {
-  pool.query('DELETE FROM users WHERE id = ?', [userId], (error) => {
-    if (error) throw error;
-    callback();
-  });
+  // pool.query("DELETE FROM users WHERE id = ?", [userId], (error) => {
+  //   if (error) throw error;
+  //   callback();
+  // });
 };
 
 module.exports = {

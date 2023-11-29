@@ -87,7 +87,6 @@ const getUserById = async (req, res) => {
 };
 
 const getUserDetail = async (userId) => {
-  console.log(userId);
   const result = await db("users")
     .select(
       "users.id",
@@ -116,7 +115,6 @@ const getUserDetail = async (userId) => {
     .join("meta", "users.id", "meta.user_id")
     .join("groups", "users.group_id", "groups.id")
     .where("users.id", userId);
-  console.log(result[0]);
   return result[0];
 };
 
@@ -148,7 +146,6 @@ const register = async (req, res) => {
     newUserData.active = 1;
     newUserData.created_on = Math.floor(Date.now() / 1000);
     newUserData.last_login = Math.floor(Date.now() / 1000);
-    // console.log(newUserData);
     const newUserId = await db("users").insert(newUserData, ["id"]);
 
     // insert data to meta table

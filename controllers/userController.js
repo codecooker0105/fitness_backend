@@ -206,6 +206,24 @@ const login = async (req, res) => {
   }
 };
 
+const view_profile = async (req, res) => {
+  const userId = req.query.user_id;
+  // get user detail
+  const userDetail = await getUserDetail(userId);
+  if (userDetail) {
+    return res.json({
+      status: 1,
+      data: userDetail,
+    });
+  } else {
+    return res.json({
+      status: 0,
+      message: "No Such User Exist",
+    })
+  }
+  
+}
+
 const updateUser = (req, res) => {
   const userId = req.params.id;
   const updatedUser = req.body;
@@ -230,4 +248,5 @@ module.exports = {
   updateUser,
   deleteUser,
   login,
+  view_profile,
 };

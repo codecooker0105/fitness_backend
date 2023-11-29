@@ -197,7 +197,7 @@ const login = async (req, res) => {
     // get user detail
     const userDetail = await getUserDetail(user.id);
     return res.json({
-      data: user,
+      status: 1,
       message: "You Are Login Successfully",
       data: userDetail,
     });

@@ -3,6 +3,7 @@ const { validationResult, check, body } = require("express-validator");
 const { getAttributes } = require("../helper/general");
 const db = require("../config/db");
 const bcrypt = require("bcrypt");
+const knex = require("knex");
 
 const metaTableFields = [
   "user_id",
@@ -35,17 +36,18 @@ const userTableFields = [
   "device_type",
   "device_token",
 ];
+
 const validateRegister = [
-  check("first_name").notEmpty().withMessage("First Name is required"),
-  check("last_name").notEmpty().withMessage("Last Name is required"),
-  check("member_type").notEmpty().withMessage("Member type is required"),
-  check("terms_accept").notEmpty().withMessage("Terms is required"),
-  check("password").notEmpty().withMessage("Password is required"),
+  check("first_name").notEmpty().withMessage("First Name is required."),
+  check("last_name").notEmpty().withMessage("Last Name is required."),
+  check("member_type").notEmpty().withMessage("Member type is required."),
+  check("terms_accept").notEmpty().withMessage("Terms is required."),
+  check("password").notEmpty().withMessage("Password is required."),
   check("email")
     .notEmpty()
-    .withMessage("Email is required")
+    .withMessage("Email is required.")
     .isEmail()
-    .withMessage("Invalid email format"),
+    .withMessage("Invalid email format."),
 ];
 
 const validateHandleRegister = async (req, res) => {
@@ -56,11 +58,49 @@ const validateHandleRegister = async (req, res) => {
 };
 
 const validateLogin = [
-  check("password").notEmpty().withMessage("Password is required"),
-  check("username").notEmpty().withMessage("username is required"),
+  check("password").notEmpty().withMessage("Password is required."),
+  check("username").notEmpty().withMessage("Username is required."),
 ];
 
 const validateHandleLogin = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+};
+
+const validateClients = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+];
+
+const validateHandleClients = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+};
+
+const validateCreateTrainerGroup = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("title").notEmpty().withMessage("Title is required."),
+  check("exp_level_id").notEmpty().withMessage("Experience Level is required."),
+];
+
+const validateHandleCreateTrainerGroup = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+};
+
+const validateEditTrainerGroup = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("group_id").notEmpty().withMessage("Group ID is required."),
+  check("title").notEmpty().withMessage("Title is required."),
+  check("exp_level_id").notEmpty().withMessage("Experience Level is required."),
+];
+
+const validateHandleEditTrainerGroup = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -116,6 +156,43 @@ const getUserDetail = async (userId) => {
     .join("groups", "users.group_id", "groups.id")
     .where("users.id", userId);
   return result[0];
+};
+
+const get_clients = async (userId) => {
+  const result = await db("users")
+    .select(
+      "trainer_clients.id",
+      "users.email",
+      "users.device_token",
+      "trainer_clients.status",
+      "meta.first_name",
+      "meta.last_name",
+      "meta.photo",
+      "meta.user_id",
+      "meta.available_equipment"
+    )
+    .join("trainer_clients", "users.email", "trainer_clients.email")
+    .join("meta", "users.id", "meta.user_id")
+    .where("trainer_clients.trainer_id", userId)
+    .whereNot("trainer_clients.status", "denied");
+  return JSON.parse(JSON.stringify(result));
+};
+
+const get_groups = async (userId) => {
+  const result = await db("trainer_client_groups").where("trainer_id", userId);
+  for (let i = 0; i < result.length; i++ ) {
+    if (result[i].exp_level_id) {
+      result[i].exp_level_name = await db(
+        "experience_level"
+      ).where("id", result[i].exp_level_id).first();
+    }
+    if (result[i].available_equipment) {
+      result[i].available_equipment_name = await db(
+        "equipment"
+      ).whereIn("id", result[i].available_equipment.split(","));
+    }
+  }
+  return JSON.parse(JSON.stringify(result));
 };
 
 const updateDevice = async (userId, updateData) => {
@@ -192,7 +269,9 @@ const login = async (req, res) => {
       updateDeviceData.device_type = userData.device_type;
     }
     await updateDevice(user.id, updateDeviceData);
-    await db("users").where("id", user.id).update('last_login', Math.floor(Date.now() / 1000));
+    await db("users")
+      .where("id", user.id)
+      .update("last_login", Math.floor(Date.now() / 1000));
 
     // get user detail
     const userDetail = await getUserDetail(user.id);
@@ -208,6 +287,7 @@ const login = async (req, res) => {
 
 const view_profile = async (req, res) => {
   const userId = req.query.user_id;
+
   // get user detail
   const userDetail = await getUserDetail(userId);
   if (userDetail) {
@@ -219,10 +299,132 @@ const view_profile = async (req, res) => {
     return res.json({
       status: 0,
       message: "No Such User Exist",
-    })
+    });
   }
-  
-}
+};
+
+const clients = async (req, res) => {
+  await validateHandleClients(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail?.group_id == 3) {
+      const result = {};
+
+      result.clients = await get_clients(userId);
+      result.trainer_groups = await get_groups(userId);
+
+      return res.json({
+        status: 1,
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainers does not exist with given ID.",
+      });
+    }
+    // console.log(bodyData.user_id);
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const create_trainer_group = async (req, res) => {
+  await validateHandleCreateTrainerGroup(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail?.group_id == 3) {
+      const insertData = {
+        title: bodyData.title,
+        trainer_id: userId,
+        exp_level_id: bodyData.exp_level_id,
+        available_equipment: bodyData.available_equipment,
+      };
+      const newGroupsId = await db("trainer_client_groups").insert(insertData, [
+        "id",
+      ]);
+      if (bodyData.clients) {
+        const client_array = bodyData.clients.split(",");
+        if (client_array.length > 0) {
+          client_array.map(async (client) => {
+            await db("trainer_clients")
+              .where("client_id", client)
+              .where("trainer_id", userId)
+              .update("trainer_group_id", newGroupsId);
+          });
+        }
+      }
+      return res.json({
+        status: 1,
+        message: "New Group saved.",
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainers does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const edit_trainer_group = async (req, res) => {
+  await validateHandleEditTrainerGroup(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail?.group_id == 3) {
+      const updateData = {
+        title: bodyData.title,
+        trainer_id: userId,
+        exp_level_id: bodyData.exp_level_id,
+        available_equipment: bodyData.available_equipment,
+      };
+      await db("trainer_client_groups")
+        .where("id", bodyData.group_id)
+        .update(updateData);
+      await db("trainer_clients")
+        .where("trainer_group_id", bodyData.group_id)
+        .update("trainer_group_id", null);
+      if (bodyData.clients) {
+        const client_array = bodyData.clients.split(",");
+        if (client_array.length > 0) {
+          client_array.map(async (client) => {
+            await db("trainer_clients")
+              .where("client_id", client)
+              .where("trainer_id", userId)
+              .update("trainer_group_id", bodyData.group_id);
+          });
+        }
+      }
+      const result = {};
+      result.clients = await get_clients(userId);
+      result.trainer_groups = await get_groups(userId);
+
+      return res.json({
+        status: 1,
+        message: "Group saved.",
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainers does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
 
 const updateUser = (req, res) => {
   const userId = req.params.id;
@@ -242,6 +444,9 @@ const deleteUser = (req, res) => {
 module.exports = {
   validateRegister,
   validateLogin,
+  validateClients,
+  validateCreateTrainerGroup,
+  validateEditTrainerGroup,
   getAllUsers,
   getUserById,
   register,
@@ -249,4 +454,7 @@ module.exports = {
   deleteUser,
   login,
   view_profile,
+  clients,
+  create_trainer_group,
+  edit_trainer_group,
 };

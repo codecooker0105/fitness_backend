@@ -185,7 +185,7 @@ const stat_list = async (userId) => {
       .where("stat_id", result[i].id)
       .first();
     if (starting_stat) {
-      result[i].starting_stat = starting_stat;
+      result[i].starting_stat = starting_stat.stat_value;
     } else {
       result[i].starting_stat = "0";
     }
@@ -195,7 +195,7 @@ const stat_list = async (userId) => {
       .where("stat_id", result[i].id)
       .first();
     if (current_stat) {
-      result[i].current_stat = current_stat;
+      result[i].current_stat = current_stat.stat_value;
     } else {
       result[i].current_stat = "0";
     }

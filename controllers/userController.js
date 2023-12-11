@@ -1,6 +1,6 @@
 // controllers/userController.js
 const { validationResult, check, body } = require("express-validator");
-const { getAttributes } = require("../helper/general");
+const { getAttributes, getFormattedDate } = require("../helper/general");
 const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const knex = require("knex");
@@ -50,7 +50,7 @@ const validateRegister = [
     .withMessage("Invalid email format."),
 ];
 
-const validateHandleRegister = async (req, res) => {
+const validateHandle = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -62,36 +62,15 @@ const validateLogin = [
   check("username").notEmpty().withMessage("Username is required."),
 ];
 
-const validateHandleLogin = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-};
-
 const validateClients = [
   check("user_id").notEmpty().withMessage("User ID is required."),
 ];
-
-const validateHandleClients = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-};
 
 const validateCreateTrainerGroup = [
   check("user_id").notEmpty().withMessage("User ID is required."),
   check("title").notEmpty().withMessage("Title is required."),
   check("exp_level_id").notEmpty().withMessage("Experience Level is required."),
 ];
-
-const validateHandleCreateTrainerGroup = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-};
 
 const validateEditTrainerGroup = [
   check("user_id").notEmpty().withMessage("User ID is required."),
@@ -100,12 +79,13 @@ const validateEditTrainerGroup = [
   check("exp_level_id").notEmpty().withMessage("Experience Level is required."),
 ];
 
-const validateHandleEditTrainerGroup = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-};
+const validateAddStat = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("title").notEmpty().withMessage("Title is required."),
+  check("measurement_type")
+    .notEmpty()
+    .withMessage("Measurement Type is required."),
+];
 
 const getAllUsers = async (req, res) => {
   try {
@@ -180,16 +160,44 @@ const get_clients = async (userId) => {
 
 const get_groups = async (userId) => {
   const result = await db("trainer_client_groups").where("trainer_id", userId);
-  for (let i = 0; i < result.length; i++ ) {
+  for (let i = 0; i < result.length; i++) {
     if (result[i].exp_level_id) {
-      result[i].exp_level_name = await db(
-        "experience_level"
-      ).where("id", result[i].exp_level_id).first();
+      result[i].exp_level_name = await db("experience_level")
+        .where("id", result[i].exp_level_id)
+        .first();
     }
     if (result[i].available_equipment) {
-      result[i].available_equipment_name = await db(
-        "equipment"
-      ).whereIn("id", result[i].available_equipment.split(","));
+      result[i].available_equipment_name = await db("equipment").whereIn(
+        "id",
+        result[i].available_equipment.split(",")
+      );
+    }
+  }
+  return JSON.parse(JSON.stringify(result));
+};
+
+const stat_list = async (userId) => {
+  const result = await db("user_stats").where("user_id", userId);
+  for (let i = 0; i < result.length; i++) {
+    const starting_stat = await db("user_stats_values")
+      .select("stat_value")
+      .orderBy("date_taken")
+      .where("stat_id", result[i].id)
+      .first();
+    if (starting_stat) {
+      result[i].starting_stat = starting_stat;
+    } else {
+      result[i].starting_stat = "0";
+    }
+    const current_stat = await db("user_stats_values")
+      .select("stat_value")
+      .orderBy("date_taken", "desc")
+      .where("stat_id", result[i].id)
+      .first();
+    if (current_stat) {
+      result[i].current_stat = current_stat;
+    } else {
+      result[i].current_stat = "0";
     }
   }
   return JSON.parse(JSON.stringify(result));
@@ -200,7 +208,7 @@ const updateDevice = async (userId, updateData) => {
 };
 
 const register = async (req, res) => {
-  await validateHandleRegister(req, res);
+  await validateHandle(req, res);
 
   try {
     const userData = JSON.parse(JSON.stringify(req.body));
@@ -243,7 +251,7 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  await validateHandleLogin(req, res);
+  await validateHandle(req, res);
 
   try {
     const userData = JSON.parse(JSON.stringify(req.body));
@@ -304,7 +312,7 @@ const view_profile = async (req, res) => {
 };
 
 const clients = async (req, res) => {
-  await validateHandleClients(req, res);
+  await validateHandle(req, res);
 
   try {
     const bodyData = JSON.parse(JSON.stringify(req.body));
@@ -326,14 +334,13 @@ const clients = async (req, res) => {
         message: "Trainers does not exist with given ID.",
       });
     }
-    // console.log(bodyData.user_id);
   } catch (e) {
     console.log(e);
   }
 };
 
 const create_trainer_group = async (req, res) => {
-  await validateHandleCreateTrainerGroup(req, res);
+  await validateHandle(req, res);
 
   try {
     const bodyData = JSON.parse(JSON.stringify(req.body));
@@ -376,7 +383,7 @@ const create_trainer_group = async (req, res) => {
 };
 
 const edit_trainer_group = async (req, res) => {
-  await validateHandleEditTrainerGroup(req, res);
+  await validateHandle(req, res);
 
   try {
     const bodyData = JSON.parse(JSON.stringify(req.body));
@@ -426,6 +433,46 @@ const edit_trainer_group = async (req, res) => {
   }
 };
 
+const add_stat = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      const insertData = {
+        user_id: userId,
+        title: bodyData.title,
+        measurement_type: bodyData.measurement_type,
+      };
+      const newStatId = await db("user_stats").insert(insertData, ["id"]);
+      if (bodyData.starting) {
+        const newUserStatsValueData = {
+          stat_id: newStatId,
+          stat_value: bodyData.starting,
+          date_taken: getFormattedDate(),
+        };
+        await db("user_stats_values").insert(newUserStatsValueData);
+      }
+      const result = await stat_list(userId);
+
+      return res.json({
+        status: 1,
+        message: "Stat created successfully.",
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "User does not exist.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 const updateUser = (req, res) => {
   const userId = req.params.id;
   const updatedUser = req.body;
@@ -447,6 +494,7 @@ module.exports = {
   validateClients,
   validateCreateTrainerGroup,
   validateEditTrainerGroup,
+  validateAddStat,
   getAllUsers,
   getUserById,
   register,
@@ -457,4 +505,5 @@ module.exports = {
   clients,
   create_trainer_group,
   edit_trainer_group,
+  add_stat,
 };

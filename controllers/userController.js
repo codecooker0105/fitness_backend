@@ -103,6 +103,13 @@ const validateViewStat = [
   check("stat_id").notEmpty().withMessage("Stat ID is required."),
 ];
 
+const validateAddFeaturedExerciseToWorkout = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("exercise").notEmpty().withMessage("Exercise is required."),
+  check("workout_id").notEmpty().withMessage("Workout ID is required."),
+  check("choice").notEmpty().withMessage("Choice is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -280,7 +287,6 @@ const view_stat_monthly = async (stat_id) => {
   }
   return JSON.parse(JSON.stringify(result));
 };
-
 
 const view_stat_normal = async (stat_id) => {
   const result = await db("user_stats").where("id", stat_id);
@@ -654,6 +660,90 @@ const view_stat = async (req, res) => {
   }
 };
 
+const add_featured_exercise_to_workout = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 2) {
+      const choice = bodyData.choice;
+      if (choice == "add_to_section") {
+        const uwsId = bodyData.uws;
+        if (uwsId) {
+          const exercise = await db("exercises")
+            .join(
+              "exercise_link_types elt",
+              "elt.exercise_id = exercises.id",
+              "left"
+            )
+            .where("id", bodyData.exercise)
+            .first();
+          const currentSectionExercise = await db("user_workout_exercises")
+            .order_by("display_order", "desc")
+            .where("workout_section_id", uwsId)
+            .first();
+          if (currentSectionExercise) {
+            const newExercise = currentSectionExercise;
+            newExercise.id = null;
+            newExercise.exercise_id = bodyData.exercise;
+            newExercise.exercise_type_id = exercise.type_id;
+            newExercise.set_type = exercise.type;
+            newExercise.weight_option = exercise.weight_type;
+            newExercise.display_order = newExercise.display_order + 1;
+            await db("user_workout_exercises").insert(newExercise);
+            return res.json({
+              status: 1,
+              message: "Exercise added to workout successfully.",
+            });
+          }
+        }
+      } else if (choice == "replace") {
+        const uweId = bodyData.uwe;
+        if (uweId) {
+          const exercise = await db("exercises")
+            .join(
+              "exercise_link_types elt",
+              "elt.exercise_id = exercises.id",
+              "left"
+            )
+            .where("id", bodyData.exercise)
+            .first();
+          const currentSectionExercise = await db("user_workout_exercises")
+            .order_by("display_order", "desc")
+            .where("id", uweId)
+            .first();
+          if (currentSectionExercise) {
+            const newExercise = currentSectionExercise;
+            newExercise.exercise_id = bodyData.exercise;
+            newExercise.exercise_type_id = exercise.type_id;
+            newExercise.set_type = exercise.type;
+            newExercise.weight_option = exercise.weight_type;
+            newExercise.display_order = newExercise.display_order + 1;
+            await db("user_workout_exercises").where("id", uweId).update(newExercise);
+            return res.json({
+              status: 1,
+              message: "Exercise replaced to workout successfully.",
+            });
+          }
+        }
+      }
+      return res.json({
+        status: 0,
+        message: "Unable to add to workout",
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 const updateUser = (req, res) => {
   const userId = req.params.id;
   const updatedUser = req.body;
@@ -678,6 +768,7 @@ module.exports = {
   validateAddStat,
   validateMyStat,
   validateViewStat,
+  validateAddFeaturedExerciseToWorkout,
   getAllUsers,
   getUserById,
   register,
@@ -691,4 +782,5 @@ module.exports = {
   add_stat,
   my_stat,
   view_stat,
+  add_featured_exercise_to_workout,
 };

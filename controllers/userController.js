@@ -116,6 +116,13 @@ const validateGetSimiliarWorkoutExercise = [
   check("workout_id").notEmpty().withMessage("Workout ID is required."),
 ];
 
+const validateAddCurrentStat = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("stat_id").notEmpty().withMessage("Stat ID is required."),
+  check("date_taken").notEmpty().withMessage("Date taken is required."),
+  check("stat_value").notEmpty().withMessage("Stat value is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -787,6 +794,50 @@ const get_similiar_workout_exercises = async (req, res) => {
   }
 };
 
+const add_current_stat = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      const stat = await db("user_stats")
+        .where("id", bodyData.stat_id)
+        .where("user_id", userId);
+      if (stat) {
+        const statValue = await db("user_stats_values")
+          .where("stat_id", bodyData.stat_id)
+          .where("date_taken", new Date(bodyData.date_taken));
+        if (statValue) {
+          await db("user_stats_values")
+            .where("id", statValue[0].id)
+            .update("stat_value", bodyData.stat_value);
+        } else {
+          const insertData = {
+            stat_value: bodyData.stat_value,
+            stat_id: bodyData.stat_id,
+            date_taken: new Date(bodyData.date_taken)
+          }
+          await db("user_stats_values").insert(insertData);
+        }
+      }
+      const result = await view_stat_normal(bodyData.stat_id);
+      return res.json({
+        status: 1,
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 const updateUser = (req, res) => {
   const userId = req.params.id;
   const updatedUser = req.body;
@@ -813,6 +864,7 @@ module.exports = {
   validateViewStat,
   validateAddFeaturedExerciseToWorkout,
   validateGetSimiliarWorkoutExercise,
+  validateAddCurrentStat,
   getAllUsers,
   getUserById,
   register,
@@ -828,4 +880,5 @@ module.exports = {
   view_stat,
   add_featured_exercise_to_workout,
   get_similiar_workout_exercises,
+  add_current_stat,
 };

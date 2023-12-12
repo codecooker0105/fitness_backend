@@ -13,6 +13,7 @@ const {
   validateViewStat,
   validateAddFeaturedExerciseToWorkout,
   validateGetSimiliarWorkoutExercise,
+  validateAddCurrentStat,
 } = require("../controllers/userController");
 
 router.post(
@@ -70,5 +71,11 @@ router.post(
   multer().none(),
   validateGetSimiliarWorkoutExercise,
   userController.get_similiar_workout_exercises
+);
+router.post(
+  "/add_current_stat",
+  multer().none(),
+  validateAddCurrentStat,
+  userController.add_current_stat
 );
 module.exports = router;

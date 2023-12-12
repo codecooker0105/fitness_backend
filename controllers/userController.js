@@ -123,6 +123,11 @@ const validateAddCurrentStat = [
   check("stat_value").notEmpty().withMessage("Stat value is required."),
 ];
 
+const validateRemoveStat = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("stat_id").notEmpty().withMessage("Stat ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -838,19 +843,30 @@ const add_current_stat = async (req, res) => {
   }
 };
 
-const updateUser = (req, res) => {
-  const userId = req.params.id;
-  const updatedUser = req.body;
-  userModel.updateUser(userId, updatedUser, () => {
-    res.sendStatus(200);
-  });
-};
+const remove_stat = async (req, res) => {
+  await validateHandle(req, res);
 
-const deleteUser = (req, res) => {
-  const userId = req.params.id;
-  userModel.deleteUser(userId, () => {
-    res.json("successfully deleted");
-  });
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      await db("user_stats").where("user_id", userId).where("id", bodyData.stat_id).del();
+      await db("user_stats_values").where("stat_id", bodyData.stat_id).del();
+      const result = await view_stat_normal(bodyData.stat_id);
+      return res.json({
+        status: 1,
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
 };
 
 module.exports = {
@@ -865,6 +881,7 @@ module.exports = {
   validateAddFeaturedExerciseToWorkout,
   validateGetSimiliarWorkoutExercise,
   validateAddCurrentStat,
+  validateRemoveStat,
   getAllUsers,
   getUserById,
   register,
@@ -881,4 +898,5 @@ module.exports = {
   add_featured_exercise_to_workout,
   get_similiar_workout_exercises,
   add_current_stat,
+  remove_stat,
 };

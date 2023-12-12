@@ -14,6 +14,7 @@ const {
   validateAddFeaturedExerciseToWorkout,
   validateGetSimiliarWorkoutExercise,
   validateAddCurrentStat,
+  validateRemoveStat,
 } = require("../controllers/userController");
 
 router.post(
@@ -77,5 +78,11 @@ router.post(
   multer().none(),
   validateAddCurrentStat,
   userController.add_current_stat
+);
+router.post(
+  "/remove_stat",
+  multer().none(),
+  validateRemoveStat,
+  userController.remove_stat
 );
 module.exports = router;

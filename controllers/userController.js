@@ -128,6 +128,11 @@ const validateRemoveStat = [
   check("stat_id").notEmpty().withMessage("Stat ID is required."),
 ];
 
+const validateDeleteWorkout = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("id").notEmpty().withMessage("Workout ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -822,8 +827,8 @@ const add_current_stat = async (req, res) => {
           const insertData = {
             stat_value: bodyData.stat_value,
             stat_id: bodyData.stat_id,
-            date_taken: new Date(bodyData.date_taken)
-          }
+            date_taken: new Date(bodyData.date_taken),
+          };
           await db("user_stats_values").insert(insertData);
         }
       }
@@ -851,7 +856,10 @@ const remove_stat = async (req, res) => {
     const userId = bodyData.user_id;
     const userDetail = await getUserDetail(userId);
     if (userDetail) {
-      await db("user_stats").where("user_id", userId).where("id", bodyData.stat_id).del();
+      await db("user_stats")
+        .where("user_id", userId)
+        .where("id", bodyData.stat_id)
+        .del();
       await db("user_stats_values").where("stat_id", bodyData.stat_id).del();
       const result = await view_stat_normal(bodyData.stat_id);
       return res.json({
@@ -862,6 +870,34 @@ const remove_stat = async (req, res) => {
       return res.json({
         status: 0,
         message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const delete_workout = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const workouts = await db("user_workouts")
+        .where("id", bodyData.id)
+        .select("trainer_workout_id");
+      await db("trainer_workouts").where("id", workouts[0].trainer_workout_id).del();
+      await db("user_workouts").where("id", bodyData.id).del();
+      return res.json({
+        status: 1,
+        message: "Workout deleted successfully.",
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
       });
     }
   } catch (e) {
@@ -882,6 +918,7 @@ module.exports = {
   validateGetSimiliarWorkoutExercise,
   validateAddCurrentStat,
   validateRemoveStat,
+  validateDeleteWorkout,
   getAllUsers,
   getUserById,
   register,
@@ -899,4 +936,5 @@ module.exports = {
   get_similiar_workout_exercises,
   add_current_stat,
   remove_stat,
+  delete_workout,
 };

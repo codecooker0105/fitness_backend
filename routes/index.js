@@ -9,6 +9,8 @@ const {
   validateCreateTrainerGroup,
   validateEditTrainerGroup,
   validateAddStat,
+  validateMyStat,
+  validateViewStat,
 } = require("../controllers/userController");
 
 router.post(
@@ -37,5 +39,7 @@ router.post(
   validateEditTrainerGroup,
   userController.edit_trainer_group
 );
-router.post("/add_stat", multer().none(), validateAddStat, userController.add_stat)
+router.post("/add_stat", multer().none(), validateAddStat, userController.add_stat);
+router.post("/my_stat", multer().none(), validateMyStat, userController.my_stat);
+router.post("/view_stat", multer().none(), validateViewStat, userController.view_stat);
 module.exports = router;

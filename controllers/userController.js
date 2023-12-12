@@ -1,6 +1,13 @@
 // controllers/userController.js
 const { validationResult, check, body } = require("express-validator");
-const { getAttributes, getFormattedDate } = require("../helper/general");
+const {
+  getAttributes,
+  getFormattedDate,
+  getMonday,
+  getSunday,
+  getFirstDayOfMonth,
+  getLastDayOfMonth,
+} = require("../helper/general");
 const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const knex = require("knex");
@@ -85,6 +92,15 @@ const validateAddStat = [
   check("measurement_type")
     .notEmpty()
     .withMessage("Measurement Type is required."),
+];
+
+const validateMyStat = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+];
+
+const validateViewStat = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("stat_id").notEmpty().withMessage("Stat ID is required."),
 ];
 
 const getAllUsers = async (req, res) => {
@@ -198,6 +214,96 @@ const stat_list = async (userId) => {
       result[i].current_stat = current_stat.stat_value;
     } else {
       result[i].current_stat = "0";
+    }
+  }
+  return JSON.parse(JSON.stringify(result));
+};
+
+const view_stat_weekly = async (stat_id) => {
+  const result = await db("user_stats").where("id", stat_id);
+  for (let i = 0; i < result.length; i++) {
+    const starting_stat = await db("user_stats_values")
+      .select("stat_value")
+      .orderBy("date_taken")
+      .where("date_taken", ">=", getMonday())
+      .where("date_taken", "<=", getSunday())
+      .where("stat_id", result[i].id)
+      .first();
+    if (starting_stat) {
+      result[i].starting_stat = starting_stat.stat_value;
+    } else {
+      result[i].starting_stat = "";
+    }
+    const current_stat = await db("user_stats_values")
+      .select("stat_value")
+      .orderBy("date_taken", "desc")
+      .where("date_taken", ">=", getMonday())
+      .where("date_taken", "<=", getSunday())
+      .where("stat_id", result[i].id)
+      .first();
+    if (current_stat) {
+      result[i].current_stat = current_stat.stat_value;
+    } else {
+      result[i].current_stat = "";
+    }
+  }
+  return JSON.parse(JSON.stringify(result));
+};
+
+const view_stat_monthly = async (stat_id) => {
+  const result = await db("user_stats").where("id", stat_id);
+  for (let i = 0; i < result.length; i++) {
+    const starting_stat = await db("user_stats_values")
+      .select("stat_value")
+      .orderBy("date_taken")
+      .where("date_taken", ">=", getFirstDayOfMonth())
+      .where("date_taken", "<=", getLastDayOfMonth())
+      .where("stat_id", result[i].id)
+      .first();
+    if (starting_stat) {
+      result[i].starting_stat = starting_stat.stat_value;
+    } else {
+      result[i].starting_stat = "";
+    }
+    const current_stat = await db("user_stats_values")
+      .select("stat_value")
+      .orderBy("date_taken", "desc")
+      .where("date_taken", ">=", getFirstDayOfMonth())
+      .where("date_taken", "<=", getLastDayOfMonth())
+      .where("stat_id", result[i].id)
+      .first();
+    if (current_stat) {
+      result[i].current_stat = current_stat.stat_value;
+    } else {
+      result[i].current_stat = "";
+    }
+  }
+  return JSON.parse(JSON.stringify(result));
+};
+
+
+const view_stat_normal = async (stat_id) => {
+  const result = await db("user_stats").where("id", stat_id);
+  for (let i = 0; i < result.length; i++) {
+    const starting_stat = await db("user_stats_values")
+      .select("stat_value")
+      .orderBy("date_taken")
+      .where("stat_id", result[i].id)
+      .first();
+    if (starting_stat) {
+      result[i].starting_stat = starting_stat.stat_value;
+    } else {
+      result[i].starting_stat = "";
+    }
+    const current_stat = await db("user_stats_values")
+      .select("stat_value")
+      .orderBy("date_taken", "desc")
+      .where("stat_id", result[i].id)
+      .first();
+    if (current_stat) {
+      result[i].current_stat = current_stat.stat_value;
+    } else {
+      result[i].current_stat = "";
     }
   }
   return JSON.parse(JSON.stringify(result));
@@ -473,6 +579,81 @@ const add_stat = async (req, res) => {
   }
 };
 
+const my_stat = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      const result = await stat_list(userId);
+
+      if (result.length > 0) {
+        return res.json({
+          status: 1,
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No stats",
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "User does not exist.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const view_stat = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      let result = null;
+      if (bodyData.interval) {
+        if (bodyData.interval == "weekly") {
+          result = await view_stat_weekly(bodyData.stat_id);
+        } else if (bodyData.interval == "monthly") {
+          result = await view_stat_monthly(bodyData.stat_id);
+        } else {
+          result = await view_stat_normal(bodyData.stat_id);
+        }
+      } else {
+        result = await view_stat_normal(bodyData.stat_id);
+      }
+
+      if (result.length > 0) {
+        return res.json({
+          status: 1,
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No stats",
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "User does not exist.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 const updateUser = (req, res) => {
   const userId = req.params.id;
   const updatedUser = req.body;
@@ -495,6 +676,8 @@ module.exports = {
   validateCreateTrainerGroup,
   validateEditTrainerGroup,
   validateAddStat,
+  validateMyStat,
+  validateViewStat,
   getAllUsers,
   getUserById,
   register,
@@ -506,4 +689,6 @@ module.exports = {
   create_trainer_group,
   edit_trainer_group,
   add_stat,
+  my_stat,
+  view_stat,
 };

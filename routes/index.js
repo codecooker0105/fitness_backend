@@ -12,6 +12,7 @@ const {
   validateMyStat,
   validateViewStat,
   validateAddFeaturedExerciseToWorkout,
+  validateGetSimiliarWorkoutExercise,
 } = require("../controllers/userController");
 
 router.post(
@@ -63,5 +64,11 @@ router.post(
   multer().none(),
   validateAddFeaturedExerciseToWorkout,
   userController.add_featured_exercise_to_workout
+);
+router.post(
+  "/get_similiar_workout_exercises",
+  multer().none(),
+  validateGetSimiliarWorkoutExercise,
+  userController.get_similiar_workout_exercises
 );
 module.exports = router;

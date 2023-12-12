@@ -110,6 +110,12 @@ const validateAddFeaturedExerciseToWorkout = [
   check("choice").notEmpty().withMessage("Choice is required."),
 ];
 
+const validateGetSimiliarWorkoutExercise = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("exercise").notEmpty().withMessage("Exercise is required."),
+  check("workout_id").notEmpty().withMessage("Workout ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -721,7 +727,9 @@ const add_featured_exercise_to_workout = async (req, res) => {
             newExercise.set_type = exercise.type;
             newExercise.weight_option = exercise.weight_type;
             newExercise.display_order = newExercise.display_order + 1;
-            await db("user_workout_exercises").where("id", uweId).update(newExercise);
+            await db("user_workout_exercises")
+              .where("id", uweId)
+              .update(newExercise);
             return res.json({
               status: 1,
               message: "Exercise replaced to workout successfully.",
@@ -732,6 +740,41 @@ const add_featured_exercise_to_workout = async (req, res) => {
       return res.json({
         status: 0,
         message: "Unable to add to workout",
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const get_similiar_workout_exercises = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 2) {
+      const result = {};
+      result.section = await db("user_workout_sections")
+        .select(
+          "user_workout_sections.id",
+          "skeleton_section_types.title as section_title"
+        )
+        .join(
+          "skeleton_section_types",
+          "user_workout_sections.section_type_id = skeleton_section_types.id"
+        )
+        .where("user_workout_sections.workout_id", bodyData.workout_id)
+        .order_by("display_order", "asc");
+      return res.json({
+        status: 1,
+        data: result,
       });
     } else {
       return res.json({
@@ -769,6 +812,7 @@ module.exports = {
   validateMyStat,
   validateViewStat,
   validateAddFeaturedExerciseToWorkout,
+  validateGetSimiliarWorkoutExercise,
   getAllUsers,
   getUserById,
   register,
@@ -783,4 +827,5 @@ module.exports = {
   my_stat,
   view_stat,
   add_featured_exercise_to_workout,
+  get_similiar_workout_exercises,
 };

@@ -133,9 +133,10 @@ const validateDeleteWorkout = [
   check("id").notEmpty().withMessage("Workout ID is required."),
 ];
 
-const validateSaveLogStats = [
+const validateConfirmTrainerRequest = [
   check("user_id").notEmpty().withMessage("User ID is required."),
-  check("id").notEmpty().withMessage("Workout ID is required."),
+  check("request_id").notEmpty().withMessage("Request ID is required."),
+  check("decision").notEmpty().withMessage("Decision is required."),
 ];
 
 const getAllUsers = async (req, res) => {
@@ -1013,6 +1014,51 @@ const get_all_workout = async (req, res) => {
   }
 };
 
+const confirm_trainer_request = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const trainerId = bodyData.request_id;
+
+    const userDetail = await getUserDetail(userId);
+    const trainerDetail = await getUserDetail(trainerId);
+    if (userDetail && userDetail.group_id == 2) {
+      const decision = bodyData.decision;
+      if (decision == "true") {
+        await db("trainer_clients")
+          .where("id", trainerId)
+          .where("client_id", userId)
+          .update({ status: "confirmed" });
+        // need to add apn
+        return res.json({
+          status: 1,
+          message: "Request confirmed successfully.",
+          data: trainerDetail.device_token,
+        });
+      } else {
+        await db("trainer_clients")
+          .where("id", trainerId)
+          .where("client_id", userId)
+          .update({ status: "denied" });
+        // need to add apn
+        return res.json({
+          status: 1,
+          message: "Request denied successfully.",
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1027,7 +1073,7 @@ module.exports = {
   validateAddCurrentStat,
   validateRemoveStat,
   validateDeleteWorkout,
-  validateSaveLogStats,
+  validateConfirmTrainerRequest,
   getAllUsers,
   getUserById,
   register,
@@ -1046,4 +1092,5 @@ module.exports = {
   delete_workout,
   save_log_stats,
   get_all_workout,
+  confirm_trainer_request,
 };

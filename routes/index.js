@@ -16,6 +16,7 @@ const {
   validateAddCurrentStat,
   validateRemoveStat,
   validateDeleteWorkout,
+  validateConfirmTrainerRequest,
 } = require("../controllers/userController");
 
 router.post(
@@ -102,5 +103,11 @@ router.post(
   multer().none(),
   validateClients,
   userController.get_all_workout
+);
+router.post(
+  "/confirm_trainer_request",
+  multer().none(),
+  validateConfirmTrainerRequest,
+  userController.confirm_trainer_request
 );
 module.exports = router;

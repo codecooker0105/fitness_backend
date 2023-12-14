@@ -139,6 +139,14 @@ const validateConfirmTrainerRequest = [
   check("decision").notEmpty().withMessage("Decision is required."),
 ];
 
+const validateEditProgressionPlan = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("progression_plan_id")
+    .notEmpty()
+    .withMessage("Progression Plan ID is required."),
+  check("workoutdays").notEmpty().withMessage("Workout Days are required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -1059,6 +1067,45 @@ const confirm_trainer_request = async (req, res) => {
   }
 };
 
+const edit_progression_plan = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const progression_plan = await db("progression_plans")
+      .where("id", bodyData.progression_plan_id)
+      .first();
+    const workoutdays = bodyData.workoutdays.split(",");
+    if (progression_plan.days_week != workoutdays.length) {
+      return res.json({
+        status: 0,
+        message:
+          "You must select " +
+          progression_plan.days_week +
+          " days a week for the " +
+          progression_plan.title +
+          " Plan.",
+      });
+    }
+    const userDetail = await getUserDetail(userId);
+    const updateData = {
+      progression_plan_id: bodyData.progression_plan_id,
+      workoutdays: bodyData.workoutdays
+    }
+    await db("meta").where("user_id", userDetail.id).update(updateData);
+    // need to add progression change
+    return res.json({
+      status: 1,
+      message: "Progression Plan updated successfully.",
+      data: userDetail
+    });
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1074,6 +1121,7 @@ module.exports = {
   validateRemoveStat,
   validateDeleteWorkout,
   validateConfirmTrainerRequest,
+  validateEditProgressionPlan,
   getAllUsers,
   getUserById,
   register,
@@ -1093,4 +1141,5 @@ module.exports = {
   save_log_stats,
   get_all_workout,
   confirm_trainer_request,
+  edit_progression_plan,
 };

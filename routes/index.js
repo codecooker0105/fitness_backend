@@ -92,4 +92,10 @@ router.post(
   validateDeleteWorkout,
   userController.delete_workout
 );
+router.post(
+  "/save_log_stats",
+  multer().none(),
+  userController.save_log_stats
+);
+
 module.exports = router;

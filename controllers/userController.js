@@ -133,6 +133,11 @@ const validateDeleteWorkout = [
   check("id").notEmpty().withMessage("Workout ID is required."),
 ];
 
+const validateSaveLogStats = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("id").notEmpty().withMessage("Workout ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -888,7 +893,9 @@ const delete_workout = async (req, res) => {
       const workouts = await db("user_workouts")
         .where("id", bodyData.id)
         .select("trainer_workout_id");
-      await db("trainer_workouts").where("id", workouts[0].trainer_workout_id).del();
+      await db("trainer_workouts")
+        .where("id", workouts[0].trainer_workout_id)
+        .del();
       await db("user_workouts").where("id", bodyData.id).del();
       return res.json({
         status: 1,
@@ -900,6 +907,48 @@ const delete_workout = async (req, res) => {
         message: "Trainer does not exist with given ID.",
       });
     }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const save_log_stats = async (req, res) => {
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const workout_date = bodyData.workout_date;
+    const exercise_id = bodyData.exercise_id;
+    const uw_id = bodyData.uw_id;
+    const uwe_id = bodyData.uwe_id;
+    const sets = bodyData.sets;
+    const reps = bodyData.reps;
+    const weight = bodyData.weight;
+    const time = bodyData.time;
+    const difficulty = bodyData.difficulty;
+
+    await db("user_workout_stats")
+      .where("user_id", userId)
+      .where("uw_id", bodyData.uw_id)
+      .where("uwe_id", bodyData.uwe_id)
+      .del();
+    sets.map(async (set) => {
+      const set_weight = weight[set] ? weight[set] : null;
+      const set_time = time[set] ? time[set] : null;
+      const rep = reps[set] ? reps[set] : null;
+      const insertData = {
+        uw_id: uw_id,
+        uwe_id: uwe_id,
+        workout_date: workout_date,
+        exercise_id: exercise_id,
+        user_id: userId,
+        difficulty: difficulty,
+        set: set,
+        weight: set_weight,
+        time: set_time,
+        rep: rep,
+      };
+      await db("user_workout_stats").insert(insertData);
+    });
   } catch (e) {
     console.log(e);
   }
@@ -919,11 +968,10 @@ module.exports = {
   validateAddCurrentStat,
   validateRemoveStat,
   validateDeleteWorkout,
+  validateSaveLogStats,
   getAllUsers,
   getUserById,
   register,
-  updateUser,
-  deleteUser,
   login,
   view_profile,
   clients,
@@ -937,4 +985,5 @@ module.exports = {
   add_current_stat,
   remove_stat,
   delete_workout,
+  save_log_stats,
 };

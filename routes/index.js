@@ -117,11 +117,16 @@ router.post(
   validateEditProgressionPlan,
   userController.edit_progression_plan
 );
-
 router.post(
   "/calendar",
   multer().none(),
   validateClients,
   userController.calendar
+);
+router.post(
+  "/calendar_per_month",
+  multer().none(),
+  validateClients,
+  userController.calendar_per_month
 );
 module.exports = router;

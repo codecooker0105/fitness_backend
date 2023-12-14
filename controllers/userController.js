@@ -381,7 +381,6 @@ const overall_workouts = async (userId, page, limit) => {
   return JSON.parse(JSON.stringify(result));
 };
 
-
 const client_overall_workouts = async (userId, page, limit) => {
   const result = await db("user_workouts")
     .select(
@@ -404,6 +403,38 @@ const client_overall_workouts = async (userId, page, limit) => {
     .orderBy("workout_date", "desc")
     .orderBy("user_workouts.id", "desc")
     .limit(limit, (page - 1) * limit);
+  return JSON.parse(JSON.stringify(result));
+};
+
+const get_monthly_workouts = async (month, year, userId) => {
+  const lastDay = new Date(year, month + 1, 0);
+  const lastDayOfMonth = String(lastDay.getDate()).padStart(2, "0");
+  const result = await db("user_workouts")
+    .select(
+      "user_workouts.id",
+      "user_workouts.title",
+      "user_workouts.workout_date",
+      "user_workouts.trainer_workout_id",
+      "user_workouts.workout_created",
+      "trainer_workouts.user_id as client_id",
+      "CONCAT((meta.first_name),(' '),( meta.last_name)) AS trainer_name"
+    )
+    .join(
+      "trainer_workouts",
+      "trainer_workouts.id",
+      "user_workouts.trainer_workout_id"
+    )
+    .join("users", "trainer_workouts.trainer_id", "users.id")
+    .join("meta", "meta.user_id", "users.id")
+    .where("trainer_workouts.user_id", userId)
+    .where("workout_date", ">=", year + "-" + month + "-01 00:00:00")
+    .where(
+      "workout_date",
+      "<=",
+      year + "-" + month + "-" + lastDayOfMonth + " 23:59:59"
+    )
+    .orderBy("workout_date", "desc")
+    .orderBy("user_workouts.id", "desc");
   return JSON.parse(JSON.stringify(result));
 };
 
@@ -1150,12 +1181,13 @@ const calendar = async (req, res) => {
     } else {
       workouts = await client_overall_workouts(userId, 1, 10000000);
     }
+    const uniqueWorkout = {};
 
     workouts.forEach((workout) => {
-      if (workout.title === '') {
-        workout.title = 'Workout';
+      if (workout.title === "") {
+        workout.title = "Workout";
       }
-    
+
       if (workout.trainer_workout_id && !uniqueWorkout[workout.workout_date]) {
         uniqueWorkout[workout.workout_date] = workout;
         result.workouts.push(workout);
@@ -1166,7 +1198,49 @@ const calendar = async (req, res) => {
       status: 1,
       data: result,
     });
-    
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const calendar_per_month = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    const now = new Date();
+    const month = bodyData.month ? bodyData.month : now.getMonth() + 1;
+    const year = bodyData.year ? bodyData.year : now.getFullYear();
+
+    const result = {
+      user: userDetail,
+      workouts: [],
+      progression_plan: [],
+    };
+
+    const uniqueWorkout = {};
+    let workouts = await get_monthly_workouts(month, year, userId);
+
+    workouts.forEach((workout) => {
+      if (workout.title === "") {
+        workout.title = "Workout";
+      }
+
+      if (workout.trainer_workout_id && !uniqueWorkout[workout.workout_date]) {
+        uniqueWorkout[workout.workout_date] = workout;
+        result.workouts.push(workout);
+      } else if (!workout.trainer_workout_id) {
+        result.progression_plan.push(workout);
+      }
+    });
+
+    return res.json({
+      status: 1,
+      data: result,
+    });
   } catch (e) {
     console.log(e);
   }
@@ -1209,4 +1283,5 @@ module.exports = {
   confirm_trainer_request,
   edit_progression_plan,
   calendar,
+  calendar_per_month,
 };

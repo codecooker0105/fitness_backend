@@ -97,5 +97,10 @@ router.post(
   multer().none(),
   userController.save_log_stats
 );
-
+router.post(
+  "/get_all_workout",
+  multer().none(),
+  validateClients,
+  userController.get_all_workout
+);
 module.exports = router;

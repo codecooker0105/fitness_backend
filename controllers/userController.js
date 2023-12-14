@@ -347,6 +347,31 @@ const updateDevice = async (userId, updateData) => {
   await db("users").where("id", userId).update(updateData);
 };
 
+const overall_workouts = async (userId, page, limit) => {
+  const result = await db("user_workouts")
+    .select(
+      "user_workouts.id",
+      "user_workouts.title",
+      "user_workouts.workout_date",
+      "user_workouts.trainer_workout_id",
+      "user_workouts.workout_created",
+      "trainer_workouts.user_id as client_id",
+      "CONCAT((meta.first_name),(' '),( meta.last_name)) AS trainer_name"
+    )
+    .join(
+      "trainer_workouts",
+      "trainer_workouts.id",
+      "user_workouts.trainer_workout_id"
+    )
+    .join("users", "trainer_workouts.trainer_id", "users.id")
+    .join("meta", "meta.user_id", "users.id")
+    .where("user_workouts.user_id", userId)
+    .orderBy("workout_date", "desc")
+    .orderBy("user_workouts.id", "desc")
+    .limit(limit, (page - 1) * limit);
+  return JSON.parse(JSON.stringify(result));
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -954,6 +979,40 @@ const save_log_stats = async (req, res) => {
   }
 };
 
+const get_all_workout = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const page = bodyData.page ? bodyData.page : 1;
+      const limit = bodyData.limit ? bodyData.limit : 1000000;
+      const result = await overall_workouts(userId, page, limit);
+      if (result) {
+        return res.json({
+          status: 1,
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No exercise found",
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -986,4 +1045,5 @@ module.exports = {
   remove_stat,
   delete_workout,
   save_log_stats,
+  get_all_workout,
 };

@@ -381,6 +381,32 @@ const overall_workouts = async (userId, page, limit) => {
   return JSON.parse(JSON.stringify(result));
 };
 
+
+const client_overall_workouts = async (userId, page, limit) => {
+  const result = await db("user_workouts")
+    .select(
+      "user_workouts.id",
+      "user_workouts.title",
+      "user_workouts.workout_date",
+      "user_workouts.trainer_workout_id",
+      "user_workouts.workout_created",
+      "trainer_workouts.user_id as client_id",
+      "CONCAT((meta.first_name),(' '),( meta.last_name)) AS trainer_name"
+    )
+    .join(
+      "trainer_workouts",
+      "trainer_workouts.id",
+      "user_workouts.trainer_workout_id"
+    )
+    .join("users", "trainer_workouts.trainer_id", "users.id")
+    .join("meta", "meta.user_id", "users.id")
+    .where("trainer_workouts.user_id", userId)
+    .orderBy("workout_date", "desc")
+    .orderBy("user_workouts.id", "desc")
+    .limit(limit, (page - 1) * limit);
+  return JSON.parse(JSON.stringify(result));
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -1092,15 +1118,55 @@ const edit_progression_plan = async (req, res) => {
     const userDetail = await getUserDetail(userId);
     const updateData = {
       progression_plan_id: bodyData.progression_plan_id,
-      workoutdays: bodyData.workoutdays
-    }
+      workoutdays: bodyData.workoutdays,
+    };
     await db("meta").where("user_id", userDetail.id).update(updateData);
     // need to add progression change
     return res.json({
       status: 1,
       message: "Progression Plan updated successfully.",
-      data: userDetail
+      data: userDetail,
     });
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const calendar = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    const result = {
+      user: userDetail,
+      workouts: [],
+    };
+    let workouts = null;
+    if (userDetail && userDetail.group_id == 3) {
+      workouts = await overall_workouts(userId, 1, 10000000);
+    } else {
+      workouts = await client_overall_workouts(userId, 1, 10000000);
+    }
+
+    workouts.forEach((workout) => {
+      if (workout.title === '') {
+        workout.title = 'Workout';
+      }
+    
+      if (workout.trainer_workout_id && !uniqueWorkout[workout.workout_date]) {
+        uniqueWorkout[workout.workout_date] = workout;
+        result.workouts.push(workout);
+      }
+    });
+
+    return res.json({
+      status: 1,
+      data: result,
+    });
+    
   } catch (e) {
     console.log(e);
   }
@@ -1142,4 +1208,5 @@ module.exports = {
   get_all_workout,
   confirm_trainer_request,
   edit_progression_plan,
+  calendar,
 };

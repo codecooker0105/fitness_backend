@@ -157,6 +157,11 @@ const validateMatchOtp = [
   check("otp").notEmpty().withMessage("Otp is required."),
 ];
 
+const validateResetPassword = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("new_password").notEmpty().withMessage("New Password is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -1602,6 +1607,35 @@ const match_otp = async (req, res) => {
   }
 };
 
+const reset_password = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      const updateData = {
+        password: await bcrypt.hash(bodyData.new_password, 10),
+        forgot_password_otp: ''
+      }
+      await db("users").where("id", userId).update(updateData);
+      return res.json({
+        status: 1,
+        message: "Password changed successfully.",
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "User does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1620,6 +1654,7 @@ module.exports = {
   validateEditProgressionPlan,
   validateChangePassword,
   validateMatchOtp,
+  validateResetPassword,
   getAllUsers,
   getUserById,
   register,
@@ -1646,4 +1681,5 @@ module.exports = {
   change_password,
   edit_account,
   match_otp,
+  reset_password,
 };

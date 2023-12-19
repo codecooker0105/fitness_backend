@@ -438,6 +438,162 @@ const get_monthly_workouts = async (month, year, userId) => {
   return JSON.parse(JSON.stringify(result));
 };
 
+const get_trainer_additional_video = async (trainerId, exerciseId) => {
+  const result = await db("additional_exercise_videos")
+    .select("mobile_video")
+    .where("trainer_id", trainerId)
+    .where("exercise_id", exerciseId)
+    .where("priority", 1);
+  if (result) {
+    return JSON.parse(JSON.stringify(result.mobile_video));
+  } else {
+    return '';
+  }
+};
+
+const get_logbook_workout = async (userId, date, workout_id) => {
+  let workout = null;
+  if (workout_id) {
+    workout = await db("user_workouts")
+      .select([
+        "user_workouts.*",
+        "trainer_workouts.trainer_id",
+        "trainer_workouts.start_date",
+        "trainer_workouts.end_date",
+      ])
+      .join(
+        "trainer_workouts",
+        "trainer_workouts.id",
+        "user_workouts.trainer_workout_id"
+      )
+      .where("user_workouts.id", workout_id)
+      .where("user_workouts.user_id", userId);
+  } else {
+    workout = await db("user_workouts")
+      .select([
+        "user_workouts.*",
+        "trainer_workouts.trainer_id",
+        "trainer_workouts.start_date",
+        "trainer_workouts.end_date",
+      ])
+      .join(
+        "trainer_workouts",
+        "trainer_workouts.id",
+        "user_workouts.trainer_workout_id"
+      )
+      .where("user_workouts.workout_date", date)
+      .where("user_workouts.user_id", userId)
+      .orderBy("user_workouts.id", "desc");
+  }
+  if (!workout) {
+    workout = await db("user_workouts")
+      .select([
+        "user_workouts.*",
+        "trainer_workouts.trainer_id",
+        "trainer_workouts.start_date",
+        "trainer_workouts.end_date",
+      ])
+      .join(
+        "trainer_workouts",
+        "trainer_workouts.id",
+        "user_workouts.trainer_workout_id"
+      )
+      .where("user_workouts.workout_date", date)
+      .where("trainer_workouts.user_id", userId)
+      .orderBy("user_workouts.id", "desc");
+    return JSON.parse(JSON.stringify(workout));
+  } else {
+    const return_workout = {
+      title: workout.title,
+      workout_id: workout.id,
+      user_id: workout.user_id,
+      trainer_workout_id: workout.trainer_workout_id,
+      trainer_group_id: workout.trainer_group_id,
+      trainer_id: workout.trainer_id ? workout.trainer_id : "",
+      workout_date: workout.workout_date,
+      start_date: workout.start_date,
+      end_date: workout.end_date,
+      completed: workout.completed,
+      created: workout.workout_created,
+      sections: [],
+    };
+    const workout_sections = await db("user_workout_sections")
+      .select(["user_workout_sections.*", "skeleton_section_types.title"])
+      .join(
+        "skeleton_section_types",
+        "skeleton_section_types.id",
+        "user_workout_sections.section_type_id"
+      )
+      .where("workout_id", workout_id)
+      .orderBy("display_order", "asc");
+    workout_sections.forEach(async (section) => {
+      return_workout.sections[section.display_order] = {
+        title: section.title,
+        section_rest: section.section_rest,
+        exercises: [],
+      };
+      const workout_exercises = await db("user_workout_exercises")
+        .select([
+          "exercises.title",
+          "exercises.mobile_video",
+          "exercises.type",
+          "exercise_types.title as type_title",
+          "exercise_types.inserted_as",
+          "user_workout_exercises.*",
+        ])
+        .join(
+          "exercise_types",
+          "exercise_types.id",
+          "user_workout_exercises.exercise_type_id"
+        )
+        .join("exercises", "exercises.id", "user_workout_exercises.exercise_id")
+        .where("workout_id", workout_id)
+        .where("workout_section_id", section.id)
+        .orderBy("display_order", "asc");
+      workout_exercises.forEach((exercise) => {
+        return_workout.sections[section.display_order].exercises[
+          exercise.display_order
+        ] = {
+          type_title: exercise.type_title,
+          id: exercise.exercise_id,
+          uwe_id: exercise.id,
+          title: exercise.title,
+          mobile_video: exercise.mobile_video,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          time: exercise.time,
+          rest: exercise.rest,
+          weight: exercise.weight,
+          set_type: exercise.set_type,
+          weight_option: exercise.weight_option,
+        };
+        if (return_workout.trainer_id && return_workout !== "") {
+          const additional_video = get_trainer_additional_video(
+            return_workout.trainer_id,
+            exercise.exercise_id
+          );
+          if (additional_video) {
+            return_workout.sections[section.display_order].exercises[
+              exercise.display_order
+            ].mobile_video = additional_video;
+          }
+          return_workout.sections[section.display_order].exercises[
+            exercise.display_order
+          ].trainer_exercise = "";
+        }
+      });
+      return_workout.sections[section.display_order].exercises =
+        return_workout.sections[section.display_order].exercises.sort(
+          (a, b) => a.display_order - b.display_order
+        );
+    });
+    return_workout.sections = return_workout.sections.sort(
+      (a, b) => a.display_order - b.display_order
+    );
+    return JSON.parse(JSON.stringify(return_workout));
+  }
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -1333,7 +1489,6 @@ const log_book = async (req, res) => {
         message: "No workout found.",
       });
     }
-
   } catch (e) {
     console.log(e);
   }

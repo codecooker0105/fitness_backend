@@ -1535,6 +1535,40 @@ const change_password = async (req, res) => {
   }
 };
 
+const edit_account = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      const updateData = {
+        first_name: bodyData.first_name ? bodyData.first_name : userDetail.first_name,
+        last_name: bodyData.last_name ? bodyData.last_name : userDetail.last_name,
+        city: bodyData.city ? bodyData.city : userDetail.city,
+        state: bodyData.state ? bodyData.state : userDetail.state,
+        zip: bodyData.zip ? bodyData.zip : userDetail.zip,
+        phone_number: bodyData.phone_number ? bodyData.phone_number : userDetail.phone_number
+      }
+      //image upload
+      await db("meta").where("id", userId).update(updateData);
+      return res.json({
+        status: 1,
+        message: "User profile updated successfully.",
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "User does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1576,4 +1610,5 @@ module.exports = {
   calendar_per_month,
   log_book,
   change_password,
+  edit_account,
 };

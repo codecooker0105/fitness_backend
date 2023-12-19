@@ -142,4 +142,10 @@ router.post(
   validateChangePassword,
   userController.change_password
 );
+router.post(
+  "/edit_account",
+  multer().none(),
+  validateClients,
+  userController.edit_account
+);
 module.exports = router;

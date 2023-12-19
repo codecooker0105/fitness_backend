@@ -498,15 +498,13 @@ const login = async (req, res) => {
 
     // update device_token and login time
     const updateDeviceData = {
-      device_token: user.device_token,
-      device_type: user.device_type,
+      device_token: userData?.device_token
+        ? userData.device_token
+        : user.device_token,
+      device_type: userData?.device_type
+        ? userData.device_type
+        : user.device_type,
     };
-    if (userData?.device_token) {
-      updateDeviceData.device_token = userData.device_token;
-    }
-    if (userData?.device_type) {
-      updateDeviceData.device_type = userData.device_type;
-    }
     await updateDevice(user.id, updateDeviceData);
     await db("users")
       .where("id", user.id)
@@ -1246,6 +1244,101 @@ const calendar_per_month = async (req, res) => {
   }
 };
 
+const log_book = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    const now = new Date();
+    const date = bodyData.date
+      ? bodyData.date
+      : now.getFullYear + "-" + (now.getMonth + 1) + "-" + now.getDate();
+    const workout = bodyData.workout_id
+      ? get_logbook_workout(userId, "", bodyData.workout_id)
+      : get_logbook_workout(userId, date, bodyData.workout_id);
+    if (workout) {
+      const updateDeviceData = {
+        device_token: bodyData?.device_token
+          ? bodyData.device_token
+          : user.device_token,
+        device_type: bodyData?.device_type
+          ? bodyData.device_type
+          : user.device_type,
+      };
+      await updateDevice(userId, updateDeviceData);
+      let uwe = {};
+
+      if (workout.created === "true") {
+        workout.sections.forEach((section) => {
+          if (section.exercises) {
+            section.exercises.forEach((exercise) => {
+              const uweId = exercise.uwe_id;
+              if (!uwe[uweId]) {
+                uwe[uweId] = {
+                  uwe_id: uweId,
+                  sets: [],
+                  reps: [],
+                  time: [],
+                  weight: [],
+                  difficulty: 2,
+                };
+              }
+
+              const exSets = exercise.sets.split("|");
+              const exWeight = exercise.weight.split("|");
+
+              exSets.forEach(async (set, index) => {
+                const saveStats = await db("user_workout_stats")
+                  .select("*")
+                  .where("uwe_id", uweId)
+                  .where("set", set)
+                  .first();
+
+                let weight = null;
+
+                if (saveStats) {
+                  weight = saveStats.weight;
+                } else if (exWeight[index] !== undefined) {
+                  weight = exWeight[index];
+                }
+
+                uwe[uweId].sets.push(set);
+
+                if (exercise.set_type === "sets_reps") {
+                  uwe[uweId].reps.push(exercise.reps);
+                } else if (exercise.set_type === "sets_time") {
+                  uwe[uweId].time.push(exercise.time);
+                }
+
+                if (exercise.weight_option === "weighted") {
+                  uwe[uweId].weight.push(weight);
+                }
+              });
+            });
+          }
+        });
+
+        workout.uwe = btoa(JSON.stringify(uwe)); // Encode to base64
+      }
+      return res.json({
+        status: 1,
+        data: workout,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "No workout found.",
+      });
+    }
+
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1284,4 +1377,5 @@ module.exports = {
   edit_progression_plan,
   calendar,
   calendar_per_month,
+  log_book,
 };

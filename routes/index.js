@@ -129,4 +129,10 @@ router.post(
   validateClients,
   userController.calendar_per_month
 );
+router.post(
+  "/log_book",
+  multer().none(),
+  validateClients,
+  userController.log_book
+);
 module.exports = router;

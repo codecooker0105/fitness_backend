@@ -167,6 +167,11 @@ const validateViewTrainerClientGroup = [
   check("group_id").notEmpty().withMessage("Group ID is required."),
 ];
 
+const validateRemoveClient = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("client_id").notEmpty().withMessage("Client ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -673,7 +678,33 @@ const delete_group = async (group_id) => {
   await db("trainer_client_groups")
     .where("trainer_group_id", group_id)
     .update("trainer_group_id", null);
-  await db("ttrainer_client_groups").where("id", group_id).del();
+  await db("trainer_client_groups").where("id", group_id).del();
+  return true;
+};
+
+const removeClient = async (trainer_id, client_id) => {
+  await db("trainer_clients")
+    .where("trainer_id", trainer_id)
+    .where("client_id", client_id)
+    .del();
+  const trainer_removed = await db("trainer_client_groups")
+    .where("trainer_id", trainer_id)
+    .first();
+  if (trainer_removed) {
+    const remove_clients = trainer_removed.removed_client_id.split(",");
+    if (!remove_clients.includes(client_id)) {
+      const newValue = [trainer_removed.removed_client_id, client_id].join(",");
+      await db("trainer_removed_clients")
+        .where("trainer_id", trainer_id)
+        .update("removed_client_id", newValue);
+    }
+  } else {
+    const newData = {
+      trainer_id: trainer_id,
+      removed_client_id: client_id,
+    };
+    await db("trainer_removed_clients").insert(newData);
+  }
   return true;
 };
 
@@ -1783,15 +1814,17 @@ const remove_group = async (req, res) => {
     if (userDetail) {
       const group = await view_group(bodyData.group_id);
       if (group) {
-        await delete_group(bodyData.group_id)
-        const result = {}
-        result.clients = await get_clients(userId);
-        result.trainer_groups = await get_groups(userId);
-        return res.json({
-          status: 1,
-          message: "Group deleted successfully.",
-          data: result,
-        });
+        const res = await delete_group(bodyData.group_id);
+        if (res) {
+          const result = {};
+          result.clients = await get_clients(userId);
+          result.trainer_groups = await get_groups(userId);
+          return res.json({
+            status: 1,
+            message: "Group deleted successfully.",
+            data: result,
+          });
+        }
       } else {
         return res.json({
           status: 0,
@@ -1802,6 +1835,37 @@ const remove_group = async (req, res) => {
       return res.json({
         status: 0,
         message: "User does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const remove_client = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const res = await removeClient(userId, bodyData.client_id);
+      if (res) {
+        const result = {};
+        result.clients = await get_clients(userId);
+        result.trainer_groups = await get_groups(userId);
+        return res.json({
+          status: 1,
+          message: "Client removed successfully.",
+          data: result,
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
       });
     }
   } catch (e) {
@@ -1829,6 +1893,7 @@ module.exports = {
   validateMatchOtp,
   validateResetPassword,
   validateViewTrainerClientGroup,
+  validateRemoveClient,
   getAllUsers,
   getUserById,
   register,
@@ -1859,4 +1924,5 @@ module.exports = {
   trainers,
   view_trainer_client_group,
   remove_group,
+  remove_client,
 };

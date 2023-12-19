@@ -18,6 +18,7 @@ const {
   validateDeleteWorkout,
   validateConfirmTrainerRequest,
   validateEditProgressionPlan,
+  validateChangePassword,
 } = require("../controllers/userController");
 
 router.post(
@@ -134,5 +135,11 @@ router.post(
   multer().none(),
   validateClients,
   userController.log_book
+);
+router.post(
+  "/change_password",
+  multer().none(),
+  validateChangePassword,
+  userController.change_password
 );
 module.exports = router;

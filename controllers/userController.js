@@ -147,6 +147,12 @@ const validateEditProgressionPlan = [
   check("workoutdays").notEmpty().withMessage("Workout Days are required."),
 ];
 
+const validateChangePassword = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("old_password").notEmpty().withMessage("Old password is required."),
+  check("new_password").notEmpty().withMessage("New password is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -670,7 +676,7 @@ const login = async (req, res) => {
     const userDetail = await getUserDetail(user.id);
     return res.json({
       status: 1,
-      message: "You Are Login Successfully",
+      message: "You login Successfully",
       data: userDetail,
     });
   } catch (e) {
@@ -1407,7 +1413,6 @@ const log_book = async (req, res) => {
     const bodyData = JSON.parse(JSON.stringify(req.body));
     const userId = bodyData.user_id;
 
-    const userDetail = await getUserDetail(userId);
     const now = new Date();
     const date = bodyData.date
       ? bodyData.date
@@ -1494,6 +1499,42 @@ const log_book = async (req, res) => {
   }
 };
 
+const change_password = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      const compareResult = await bcrypt.compare(
+        bodyData.old_password,
+        userDetail.password
+      );
+      if (!compareResult) {
+        return res.json({ status: 0, message: "In-Correct password." });
+      }
+      const updateData = {
+        password: await bcrypt.hash(bodyData.new_password, 10),
+        remember_code: ''
+      }
+      await db("users").where("id", userId).update(updateData);
+      return res.json({
+        status: 1,
+        message: "Password updated successfully.",
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "User does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1510,6 +1551,7 @@ module.exports = {
   validateDeleteWorkout,
   validateConfirmTrainerRequest,
   validateEditProgressionPlan,
+  validateChangePassword,
   getAllUsers,
   getUserById,
   register,
@@ -1533,4 +1575,5 @@ module.exports = {
   calendar,
   calendar_per_month,
   log_book,
+  change_password,
 };

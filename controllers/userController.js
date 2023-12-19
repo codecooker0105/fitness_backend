@@ -153,6 +153,10 @@ const validateChangePassword = [
   check("new_password").notEmpty().withMessage("New password is required."),
 ];
 
+const validateMatchOtp = [
+  check("otp").notEmpty().withMessage("Otp is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -599,6 +603,11 @@ const get_logbook_workout = async (userId, date, workout_id) => {
     return JSON.parse(JSON.stringify(return_workout));
   }
 };
+
+const validate_otp = async (otp) => {
+  const result = await db("users").where("forgot_password_otp", otp);
+  return JSON.parse(JSON.stringify(result));
+}
 
 const register = async (req, res) => {
   await validateHandle(req, res);
@@ -1569,6 +1578,30 @@ const edit_account = async (req, res) => {
   }
 };
 
+const match_otp = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+
+    const otp_user = await validate_otp(bodyData.otp);
+    if (otp_user) {
+      return res.json({
+        status: 1,
+        message: "OTP is valid.",
+        data: otp_user.id
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Invalid OTP.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1586,6 +1619,7 @@ module.exports = {
   validateConfirmTrainerRequest,
   validateEditProgressionPlan,
   validateChangePassword,
+  validateMatchOtp,
   getAllUsers,
   getUserById,
   register,
@@ -1611,4 +1645,5 @@ module.exports = {
   log_book,
   change_password,
   edit_account,
+  match_otp,
 };

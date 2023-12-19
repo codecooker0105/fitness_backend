@@ -19,6 +19,7 @@ const {
   validateConfirmTrainerRequest,
   validateEditProgressionPlan,
   validateChangePassword,
+  validateMatchOtp,
 } = require("../controllers/userController");
 
 router.post(
@@ -147,5 +148,11 @@ router.post(
   multer().none(),
   validateClients,
   userController.edit_account
+);
+router.post(
+  "/match_otp",
+  multer().none(),
+  validateMatchOtp,
+  userController.match_otp
 );
 module.exports = router;

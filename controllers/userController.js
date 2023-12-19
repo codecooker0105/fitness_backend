@@ -462,7 +462,7 @@ const get_trainer_additional_video = async (trainerId, exerciseId) => {
   if (result) {
     return JSON.parse(JSON.stringify(result.mobile_video));
   } else {
-    return '';
+    return "";
   }
 };
 
@@ -612,7 +612,25 @@ const get_logbook_workout = async (userId, date, workout_id) => {
 const validate_otp = async (otp) => {
   const result = await db("users").where("forgot_password_otp", otp);
   return JSON.parse(JSON.stringify(result));
-}
+};
+
+const get_trainers = async (member_email) => {
+  const result = await db("users")
+    .select(
+      "trainer_clients.id",
+      "users.email",
+      "trainer_clients.status",
+      "meta.first_name",
+      "meta.last_name",
+      "meta.photo",
+      "meta.user_id"
+    )
+    .join("trainer_clients", "users.id", "trainer_clients.trainer_id")
+    .join("meta", "users.id", "meta.user_id")
+    .where("trainer_clients.email", member_email)
+    .whereNot("trainer_clients.status", "denied");
+  return JSON.parse(JSON.stringify(result));
+};
 
 const register = async (req, res) => {
   await validateHandle(req, res);
@@ -1531,8 +1549,8 @@ const change_password = async (req, res) => {
       }
       const updateData = {
         password: await bcrypt.hash(bodyData.new_password, 10),
-        remember_code: ''
-      }
+        remember_code: "",
+      };
       await db("users").where("id", userId).update(updateData);
       return res.json({
         status: 1,
@@ -1559,13 +1577,19 @@ const edit_account = async (req, res) => {
     const userDetail = await getUserDetail(userId);
     if (userDetail) {
       const updateData = {
-        first_name: bodyData.first_name ? bodyData.first_name : userDetail.first_name,
-        last_name: bodyData.last_name ? bodyData.last_name : userDetail.last_name,
+        first_name: bodyData.first_name
+          ? bodyData.first_name
+          : userDetail.first_name,
+        last_name: bodyData.last_name
+          ? bodyData.last_name
+          : userDetail.last_name,
         city: bodyData.city ? bodyData.city : userDetail.city,
         state: bodyData.state ? bodyData.state : userDetail.state,
         zip: bodyData.zip ? bodyData.zip : userDetail.zip,
-        phone_number: bodyData.phone_number ? bodyData.phone_number : userDetail.phone_number
-      }
+        phone_number: bodyData.phone_number
+          ? bodyData.phone_number
+          : userDetail.phone_number,
+      };
       //image upload
       await db("meta").where("id", userId).update(updateData);
       return res.json({
@@ -1594,7 +1618,7 @@ const match_otp = async (req, res) => {
       return res.json({
         status: 1,
         message: "OTP is valid.",
-        data: otp_user.id
+        data: otp_user.id,
       });
     } else {
       return res.json({
@@ -1618,8 +1642,8 @@ const reset_password = async (req, res) => {
     if (userDetail) {
       const updateData = {
         password: await bcrypt.hash(bodyData.new_password, 10),
-        forgot_password_otp: ''
-      }
+        forgot_password_otp: "",
+      };
       await db("users").where("id", userId).update(updateData);
       return res.json({
         status: 1,
@@ -1629,6 +1653,41 @@ const reset_password = async (req, res) => {
       return res.json({
         status: 0,
         message: "User does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const trainers = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 2) {
+      const result = {
+        trainers: null,
+      }
+      result.trainers = await get_trainers(userDetail.email);
+      if (result.trainers) {
+        return res.json({
+          status: 1,
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "There Are No Trainers.",
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Member does not exist with given ID.",
       });
     }
   } catch (e) {
@@ -1682,4 +1741,5 @@ module.exports = {
   edit_account,
   match_otp,
   reset_password,
+  trainers,
 };

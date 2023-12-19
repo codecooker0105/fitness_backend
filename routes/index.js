@@ -162,4 +162,10 @@ router.post(
   validateResetPassword,
   userController.reset_password
 );
+router.post(
+  "/trainers",
+  multer().none(),
+  validateClients,
+  userController.trainers
+);
 module.exports = router;

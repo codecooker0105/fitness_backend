@@ -23,6 +23,7 @@ const {
   validateResetPassword,
   validateViewTrainerClientGroup,
   validateRemoveClient,
+  validateRemoveTrainer,
 } = require("../controllers/userController");
 
 router.post(
@@ -187,5 +188,11 @@ router.post(
   multer().none(),
   validateRemoveClient,
   userController.remove_client
+);
+router.post(
+  "/remove_trainer",
+  multer().none(),
+  validateRemoveTrainer,
+  userController.remove_trainer
 );
 module.exports = router;

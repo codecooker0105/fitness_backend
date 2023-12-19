@@ -172,6 +172,11 @@ const validateRemoveClient = [
   check("client_id").notEmpty().withMessage("Client ID is required."),
 ];
 
+const validateRemoveTrainer = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("trainer_id").notEmpty().withMessage("Trainer ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -705,6 +710,14 @@ const removeClient = async (trainer_id, client_id) => {
     };
     await db("trainer_removed_clients").insert(newData);
   }
+  return true;
+};
+
+const removeTrainer = async (client_id, trainer_id) => {
+  await db("trainer_clients")
+    .where("trainer_id", trainer_id)
+    .where("client_id", client_id)
+    .del();
   return true;
 };
 
@@ -1873,6 +1886,37 @@ const remove_client = async (req, res) => {
   }
 };
 
+const remove_trainer = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 2) {
+      const res = await removeTrainer(userId, bodyData.trainer_id);
+      if (res) {
+        const result = {};
+        result.clients = await get_clients(userId);
+        result.trainer_groups = await get_groups(userId);
+        return res.json({
+          status: 1,
+          message: "Trainer removed successfully.",
+          data: result,
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1894,6 +1938,7 @@ module.exports = {
   validateResetPassword,
   validateViewTrainerClientGroup,
   validateRemoveClient,
+  validateRemoveTrainer,
   getAllUsers,
   getUserById,
   register,
@@ -1925,4 +1970,5 @@ module.exports = {
   view_trainer_client_group,
   remove_group,
   remove_client,
+  remove_trainer,
 };

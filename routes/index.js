@@ -175,4 +175,10 @@ router.post(
   validateViewTrainerClientGroup,
   userController.view_trainer_client_group
 );
+router.post(
+  "/remove_group",
+  multer().none(),
+  validateViewTrainerClientGroup,
+  userController.remove_group
+);
 module.exports = router;

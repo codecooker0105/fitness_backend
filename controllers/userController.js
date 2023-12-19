@@ -651,21 +651,30 @@ const view_group = async (group_id) => {
         group.available_equipment.split(",")
       );
     }
-    group.members = await db("users").select(
-      "trainer_clients.id",
-      "users.email",
-      "trainer_clients.status",
-      "meta.first_name",
-      "meta.last_name",
-      "meta.photo",
-      "meta.user_id"
-    )
-    .join("trainer_clients", "users.id", "trainer_clients.client_id")
-    .join("meta", "users.id", "meta.user_id")
-    .where("trainer_clients.trainer_group_id", group_id);
-    group.clients = group.members.map(member => member.user_id).join(",");
+    group.members = await db("users")
+      .select(
+        "trainer_clients.id",
+        "users.email",
+        "trainer_clients.status",
+        "meta.first_name",
+        "meta.last_name",
+        "meta.photo",
+        "meta.user_id"
+      )
+      .join("trainer_clients", "users.id", "trainer_clients.client_id")
+      .join("meta", "users.id", "meta.user_id")
+      .where("trainer_clients.trainer_group_id", group_id);
+    group.clients = group.members.map((member) => member.user_id).join(",");
   }
   return JSON.parse(JSON.stringify(group));
+};
+
+const delete_group = async (group_id) => {
+  await db("trainer_client_groups")
+    .where("trainer_group_id", group_id)
+    .update("trainer_group_id", null);
+  await db("ttrainer_client_groups").where("id", group_id).del();
+  return true;
 };
 
 const register = async (req, res) => {
@@ -1763,6 +1772,43 @@ const view_trainer_client_group = async (req, res) => {
   }
 };
 
+const remove_group = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      const group = await view_group(bodyData.group_id);
+      if (group) {
+        await delete_group(bodyData.group_id)
+        const result = {}
+        result.clients = await get_clients(userId);
+        result.trainer_groups = await get_groups(userId);
+        return res.json({
+          status: 1,
+          message: "Group deleted successfully.",
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No Such Group Exist.",
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "User does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1812,4 +1858,5 @@ module.exports = {
   reset_password,
   trainers,
   view_trainer_client_group,
+  remove_group,
 };

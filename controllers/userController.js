@@ -162,6 +162,11 @@ const validateResetPassword = [
   check("new_password").notEmpty().withMessage("New Password is required."),
 ];
 
+const validateViewTrainerClientGroup = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("group_id").notEmpty().withMessage("Group ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -630,6 +635,37 @@ const get_trainers = async (member_email) => {
     .where("trainer_clients.email", member_email)
     .whereNot("trainer_clients.status", "denied");
   return JSON.parse(JSON.stringify(result));
+};
+
+const view_group = async (group_id) => {
+  const group = await db("trainer_client_groups").where("id", group_id);
+  if (group) {
+    if (group.exp_level_id) {
+      group.exp_level_name = await db("experience_level")
+        .where("id", group.exp_level_id)
+        .first();
+    }
+    if (group.available_equipment) {
+      group.available_equipment_name = await db("equipment").whereIn(
+        "id",
+        group.available_equipment.split(",")
+      );
+    }
+    group.members = await db("users").select(
+      "trainer_clients.id",
+      "users.email",
+      "trainer_clients.status",
+      "meta.first_name",
+      "meta.last_name",
+      "meta.photo",
+      "meta.user_id"
+    )
+    .join("trainer_clients", "users.id", "trainer_clients.client_id")
+    .join("meta", "users.id", "meta.user_id")
+    .where("trainer_clients.trainer_group_id", group_id);
+    group.clients = group.members.map(member => member.user_id).join(",");
+  }
+  return JSON.parse(JSON.stringify(group));
 };
 
 const register = async (req, res) => {
@@ -1671,7 +1707,7 @@ const trainers = async (req, res) => {
     if (userDetail && userDetail.group_id == 2) {
       const result = {
         trainers: null,
-      }
+      };
       result.trainers = await get_trainers(userDetail.email);
       if (result.trainers) {
         return res.json({
@@ -1688,6 +1724,38 @@ const trainers = async (req, res) => {
       return res.json({
         status: 0,
         message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const view_trainer_client_group = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail) {
+      const group = await view_group(bodyData.group_id);
+      if (group) {
+        return res.json({
+          status: 1,
+          data: group,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No Such Group Exist.",
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "User does not exist with given ID.",
       });
     }
   } catch (e) {
@@ -1714,6 +1782,7 @@ module.exports = {
   validateChangePassword,
   validateMatchOtp,
   validateResetPassword,
+  validateViewTrainerClientGroup,
   getAllUsers,
   getUserById,
   register,
@@ -1742,4 +1811,5 @@ module.exports = {
   match_otp,
   reset_password,
   trainers,
+  view_trainer_client_group,
 };

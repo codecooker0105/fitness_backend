@@ -21,6 +21,7 @@ const {
   validateChangePassword,
   validateMatchOtp,
   validateResetPassword,
+  validateViewTrainerClientGroup,
 } = require("../controllers/userController");
 
 router.post(
@@ -167,5 +168,11 @@ router.post(
   multer().none(),
   validateClients,
   userController.trainers
+);
+router.post(
+  "/view_trainer_client_group",
+  multer().none(),
+  validateViewTrainerClientGroup,
+  userController.view_trainer_client_group
 );
 module.exports = router;

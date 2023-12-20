@@ -195,4 +195,10 @@ router.post(
   validateRemoveTrainer,
   userController.remove_trainer
 );
+router.post(
+  "/workout_generator_array",
+  multer().none(),
+  validateClients,
+  userController.workout_generator_array
+);
 module.exports = router;

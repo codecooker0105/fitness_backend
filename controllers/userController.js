@@ -721,6 +721,36 @@ const removeTrainer = async (client_id, trainer_id) => {
   return true;
 };
 
+const get_groups_for_workout = async (trainer_id) => {
+  const groups = await db("trainer_client_groups")
+    .select(
+      "CONCAT('group-',trainer_client_groups.id) as group_id",
+      "trainer_client_groups.*"
+    )
+    .where("trainer_id", trainer_id);
+  if (groups) {
+    for (let i = 0; i < groups.length; i++) {
+      if (groups[i].exp_level_id) {
+        groups[i].exp_level_name = await db("experience_level")
+          .where("id", groups[i].exp_level_id)
+          .first();
+      }
+      if (groups[i].available_equipment) {
+        groups[i].available_equipment_name = await db("equipment").whereIn(
+          "id",
+          groups[i].available_equipment.split(",")
+        );
+      }
+      const members = await db("trainer_clients").where(
+        "trainer_group_id",
+        groups[i].id
+      );
+      groups[i].members_count = members.length;
+    }
+  }
+  return JSON.parse(JSON.stringify(groups));
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -1917,6 +1947,74 @@ const remove_trainer = async (req, res) => {
   }
 };
 
+const workout_generator_array = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const result = {
+        progression_id: [],
+        skeleton_workout_id: [],
+        available_equipment: [],
+        client: {},
+        workoutdays: [],
+      };
+      result.progression_id = await db("progressions").select();
+      result.skeleton_workout_id = await db("skeleton_workouts").select();
+      result.available_equipment = await db("equipment").select();
+      result.client.clients = await get_clients(userId);
+      result.client.groups = await get_groups_for_workout(userId);
+      result.workoutdays = [
+        {
+          id: 1,
+          value: "Monday",
+        },
+        {
+          id: 2,
+          value: "Tuesday",
+        },
+        {
+          id: 3,
+          value: "Wednesday",
+        },
+        {
+          id: 4,
+          value: "Thursday",
+        },
+        {
+          id: 5,
+          value: "Friday",
+        },
+        {
+          id: 6,
+          value: "Saturday",
+        },
+        {
+          id: 7,
+          value: "Sunday",
+        },
+      ];
+
+      return res.json({
+        status: 1,
+        message: "List of array for workout.",
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -1971,4 +2069,5 @@ module.exports = {
   remove_group,
   remove_client,
   remove_trainer,
+  workout_generator_array,
 };

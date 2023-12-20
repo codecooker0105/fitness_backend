@@ -2125,6 +2125,25 @@ const skeleton_section_types_array = async (req, res) => {
   }
 };
 
+const exercise_types_array = async (req, res) => {
+  try {
+    const result = await db("exercise_types").orderBy("title", "asc").select();
+    if (result) {
+      return res.json({
+        status: 1,
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "No exercise found.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2182,4 +2201,5 @@ module.exports = {
   workout_generator_array,
   skeleton_json,
   skeleton_section_types_array,
+  exercise_types_array,
 };

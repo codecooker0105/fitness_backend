@@ -212,4 +212,9 @@ router.post(
   multer().none(),
   userController.skeleton_section_types_array
 );
+router.post(
+  "/exercise_types_array",
+  multer().none(),
+  userController.exercise_types_array
+);
 module.exports = router;

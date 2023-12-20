@@ -217,4 +217,10 @@ router.post(
   multer().none(),
   userController.exercise_types_array
 );
+router.post(
+  "/get_all_exercises",
+  multer().none(),
+  validateClients,
+  userController.get_all_exercises
+);
 module.exports = router;

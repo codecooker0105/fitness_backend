@@ -776,6 +776,49 @@ const get_skeleton_generator = async (option) => {
   return JSON.parse(JSON.stringify(result));
 };
 
+const get_exercises = async (options, page, limit) => {
+  const result = await db("exercises")
+    .select(["exercises.*", "exercise_types.title as type_title"])
+    .join(
+      "exercise_link_types",
+      "exercise_link_types.exercise_id",
+      "exercises.id"
+    )
+    .join("exercise_types", "exercise_types.id", "exercise_link_types.type_id")
+    .where((qb) => {
+      if (options.user_id) {
+        qb.where("created_by", options.user_id);
+      }
+      if (options.available_equipment) {
+        qb.whereRaw(
+          "(id NOT IN(SELECT exercise_id FROM exercise_equipment GROUP BY exercise_id) OR id IN (SELECT exercise_id FROM exercise_equipment WHERE equipment_id IN (" +
+            options.available_equipment +
+            ")))"
+        );
+      }
+      if (options.exercise_type) {
+        qb.whereRaw(
+          "id IN (SELECT exercise_id FROM exercise_link_types WHERE type_id = '" +
+            options.exercise_type +
+            "')"
+        );
+      }
+      if (options.muscle) {
+        qb.whereRaw(
+          "id IN (SELECT exercise_id FROM exercise_muscles WHERE muscle_id = '" +
+            options.muscle +
+            "')"
+        );
+      }
+      if (options.experience_level) {
+        qb.orWhere("experience_id", options.experience_level);
+      }
+    })
+    .orderBy("title", "asc")
+    .limit(limit, (page - 1) * limit);
+  return JSON.parse(JSON.stringify(result));
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -2144,6 +2187,38 @@ const exercise_types_array = async (req, res) => {
   }
 };
 
+const get_all_exercises = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const page = bodyData.page ? bodyData.page : 1;
+      const limit = bodyData.limit ? bodyData.limit : 1000000;
+      const option = {
+        user_id: userId,
+      };
+      const result = await get_exercises(option, page, limit);
+      if (result) {
+        return res.json({
+          status: 1,
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No exercise found.",
+        });
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2202,4 +2277,5 @@ module.exports = {
   skeleton_json,
   skeleton_section_types_array,
   exercise_types_array,
+  get_all_exercises,
 };

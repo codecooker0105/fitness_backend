@@ -2244,6 +2244,11 @@ const get_all_exercises = async (req, res) => {
           message: "No exercise found.",
         });
       }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
     }
   } catch (e) {
     console.log(e);
@@ -2274,6 +2279,11 @@ const exercises = async (req, res) => {
           message: "No exercise found.",
         });
       }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
     }
   } catch (e) {
     console.log(e);
@@ -2340,4 +2350,5 @@ module.exports = {
   skeleton_section_types_array,
   exercise_types_array,
   get_all_exercises,
+  exercises,
 };

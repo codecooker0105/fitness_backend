@@ -201,4 +201,10 @@ router.post(
   validateClients,
   userController.workout_generator_array
 );
+router.post(
+  "/skeleton_json",
+  multer().none(),
+  validateClients,
+  userController.skeleton_json
+);
 module.exports = router;

@@ -751,6 +751,29 @@ const get_groups_for_workout = async (trainer_id) => {
   return JSON.parse(JSON.stringify(groups));
 };
 
+const get_skeleton_generator = async (option) => {
+  const result = {
+    hybrid_workout_sections: null,
+    skeleton_section_types: null,
+    exercise_types: null,
+  };
+  result.hybrid_workout_sections = await db("skeleton_section")
+    .select([
+      "skeleton_section_types.title",
+      "skeleton_section_types.type",
+      "skeleton_section.*",
+    ])
+    .join(
+      "skeleton_section_types",
+      "skeleton_section_types.id",
+      "skeleton_section.section_type_id"
+    )
+    .where("skeleton_id", option.id);
+  result.skeleton_section_types = await db("skeleton_section_types").select();
+  result.exercise_types = await db("exercise_types").orderBy("title", "asc").select();
+  return JSON.parse(JSON.stringify(result));
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -2015,6 +2038,72 @@ const workout_generator_array = async (req, res) => {
   }
 };
 
+const skeleton_json = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const param = {
+        skeleton_workout_id: bodyData.skeleton_workout_id
+          ? bodyData.skeleton_workout_id
+          : null,
+        user_id: bodyData.client ? bodyData.client : userId,
+        progression_id: "",
+        available_equipment: null,
+      };
+      if (bodyData.progression_id) {
+        const progression = await db("progression_plan_days")
+          .select(["progressions.*"])
+          .join(
+            "progressions",
+            "progressions.id",
+            "progression_plan_days.progression_id"
+          )
+          .where("day", userDetail.progression_plan_day)
+          .where("plan_id", userDetail.progression_plan_id)
+          .first();
+        const hybrid_workout = await db("skeleton_workouts")
+          .select(["skeleton_workouts.*"])
+          .join(
+            "skeleton_focus",
+            "skeleton_focus.skeleton_id",
+            "skeleton_workouts.id"
+          )
+          .where("skeleton_focus.progression_id", progression.id)
+          .first();
+        param.progression_id = progression.id;
+        param.skeleton_workout_id = hybrid_workout.id;
+      }
+      const postAvailableEquipment = bodyData.available_equipment;
+
+      if (postAvailableEquipment !== "" && postAvailableEquipment !== "none") {
+        param.available_equipment = postAvailableEquipment.split(",");
+      } else if (postAvailableEquipment === "none") {
+        param.available_equipment = postAvailableEquipment;
+      } else {
+        param.available_equipment = "";
+      }
+      const result = await get_skeleton_generator(param);
+      return res.json({
+        status: 1,
+        message: "List of array for workout.",
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2070,4 +2159,5 @@ module.exports = {
   remove_client,
   remove_trainer,
   workout_generator_array,
+  skeleton_json,
 };

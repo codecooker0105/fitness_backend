@@ -24,6 +24,7 @@ const {
   validateViewTrainerClientGroup,
   validateRemoveClient,
   validateRemoveTrainer,
+  validateExercises,
 } = require("../controllers/userController");
 
 router.post(
@@ -222,5 +223,11 @@ router.post(
   multer().none(),
   validateClients,
   userController.get_all_exercises
+);
+router.post(
+  "/exercises",
+  multer().none(),
+  validateExercises,
+  userController.exercises
 );
 module.exports = router;

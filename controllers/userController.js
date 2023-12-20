@@ -177,6 +177,14 @@ const validateRemoveTrainer = [
   check("trainer_id").notEmpty().withMessage("Trainer ID is required."),
 ];
 
+const validateExercises = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("exercise_type_id")
+    .notEmpty()
+    .withMessage("Exercise Type ID is required."),
+  check("section_id").notEmpty().withMessage("Section ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -580,7 +588,7 @@ const get_logbook_workout = async (userId, date, workout_id) => {
         .where("workout_id", workout_id)
         .where("workout_section_id", section.id)
         .orderBy("display_order", "asc");
-      workout_exercises.forEach((exercise) => {
+      workout_exercises.forEach(async (exercise) => {
         return_workout.sections[section.display_order].exercises[
           exercise.display_order
         ] = {
@@ -598,7 +606,7 @@ const get_logbook_workout = async (userId, date, workout_id) => {
           weight_option: exercise.weight_option,
         };
         if (return_workout.trainer_id && return_workout !== "") {
-          const additional_video = get_trainer_additional_video(
+          const additional_video = await get_trainer_additional_video(
             return_workout.trainer_id,
             exercise.exercise_id
           );
@@ -816,6 +824,29 @@ const get_exercises = async (options, page, limit) => {
     })
     .orderBy("title", "asc")
     .limit(limit, (page - 1) * limit);
+  return JSON.parse(JSON.stringify(result));
+};
+
+const exercisesByExerciseTypeId = async (exercise_type_id, trainer_id) => {
+  const result = await db("exercises")
+    .select("id", "title", "video", "mobile_video", "type")
+    .whereRaw(
+      "id in (SELECT exercise_id FROM exercise_link_types WHERE type_id = '" +
+        exercise_type_id +
+        "' ORDER BY title)"
+    );
+  if (result) {
+    result.forEach(async (exercise, key) => {
+      const additional_video = await get_trainer_additional_video(
+        trainer_id,
+        exercise.id
+      );
+      if (additional_video) {
+        result[key].mobile_video = additional_video;
+      }
+      result[key].trainer_exercise = "";
+    });
+  }
   return JSON.parse(JSON.stringify(result));
 };
 
@@ -2219,6 +2250,36 @@ const get_all_exercises = async (req, res) => {
   }
 };
 
+const exercises = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const result = await exercisesByExerciseTypeId(
+        bodyData.exercise_type_id,
+        userId
+      );
+      if (result) {
+        return res.json({
+          status: 1,
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No exercise found.",
+        });
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2241,6 +2302,7 @@ module.exports = {
   validateViewTrainerClientGroup,
   validateRemoveClient,
   validateRemoveTrainer,
+  validateExercises,
   getAllUsers,
   getUserById,
   register,

@@ -770,7 +770,9 @@ const get_skeleton_generator = async (option) => {
     )
     .where("skeleton_id", option.id);
   result.skeleton_section_types = await db("skeleton_section_types").select();
-  result.exercise_types = await db("exercise_types").orderBy("title", "asc").select();
+  result.exercise_types = await db("exercise_types")
+    .orderBy("title", "asc")
+    .select();
   return JSON.parse(JSON.stringify(result));
 };
 
@@ -2104,6 +2106,25 @@ const skeleton_json = async (req, res) => {
   }
 };
 
+const skeleton_section_types_array = async (req, res) => {
+  try {
+    const result = await db("skeleton_section_types").select();
+    if (result) {
+      return res.json({
+        status: 1,
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "No section found.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2160,4 +2181,5 @@ module.exports = {
   remove_trainer,
   workout_generator_array,
   skeleton_json,
+  skeleton_section_types_array,
 };

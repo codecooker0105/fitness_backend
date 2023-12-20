@@ -207,4 +207,9 @@ router.post(
   validateClients,
   userController.skeleton_json
 );
+router.post(
+  "/skeleton_section_types_array",
+  multer().none(),
+  userController.skeleton_section_types_array
+);
 module.exports = router;

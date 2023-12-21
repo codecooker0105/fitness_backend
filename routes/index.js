@@ -230,4 +230,10 @@ router.post(
   validateExercises,
   userController.exercises
 );
+router.post(
+  "/featured_exercise",
+  multer().none(),
+  validateClients,
+  userController.featured_exercise
+);
 module.exports = router;

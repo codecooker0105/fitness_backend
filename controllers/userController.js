@@ -850,6 +850,72 @@ const exercisesByExerciseTypeId = async (exercise_type_id, trainer_id) => {
   return JSON.parse(JSON.stringify(result));
 };
 
+const get_random_exercise = async (options) => {
+  const result = await db("exercises")
+    .select(["exercises.*", "exercise_types.title as type_title"])
+    .join(
+      "exercise_link_types",
+      "exercise_link_types.exercise_id",
+      "exercises.id"
+    )
+    .join("exercise_types", "exercise_types.id", "exercise_link_types.type_id")
+    .where((qb) => {
+      if (options.user_id) {
+        qb.whereRaw(
+          "id IN (SELECT exercise_id FROM user_available_exercises WHERE user_id = '" +
+            options.user_id +
+            "')"
+        );
+      }
+      if (options.available_equipment) {
+        qb.whereRaw(
+          "(id NOT IN(SELECT exercise_id FROM exercise_equipment GROUP BY exercise_id) OR id IN (SELECT exercise_id FROM exercise_equipment WHERE equipment_id IN (" +
+            options.available_equipment +
+            ")))"
+        );
+      }
+      if (options.exercise_type) {
+        qb.whereRaw(
+          "id IN (SELECT exercise_id FROM exercise_link_types WHERE type_id = '" +
+            options.exercise_type +
+            "')"
+        );
+      }
+    })
+    .orderBy("title", "asc")
+    .limit(limit, (page - 1) * limit);
+  return JSON.parse(JSON.stringify(result));
+};
+
+const get_upcoming_created_workouts = async (user_id) => {
+  const upcomingWorkoutIds = await db("user_workouts")
+    .select(["Max(user_workouts.id) as id"])
+    .where("user_id", user_id)
+    .where("completed", "false")
+    .where("workout_created", "true")
+    .where("workout_date", ">=", getFormattedDate())
+    .orderBy("workout_date", "asc")
+    .orderBy("id", "desc")
+    .groupBy("user_workouts.workout_date");
+  const workoutIdsArray = upcomingWorkoutIds.map((workout) => workout.id);
+  let result = null;
+  if (!workoutIdsArray) {
+    result = await db("user_workouts")
+      .select(
+        "user_workouts.id",
+        "user_workouts.title",
+        "user_workouts.workout_date"
+      )
+      .whereIn("id", workoutIdsArray)
+      .orderBy("workout_date", "asc");
+  }
+  if (result) {
+    return JSON.parse(JSON.stringify(result));
+  } else {
+    return null;
+  }
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -2290,6 +2356,39 @@ const exercises = async (req, res) => {
   }
 };
 
+const featured_exercise = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 2) {
+      const option = {
+        user_id: userId,
+      };
+      const result = {
+        featured_exercise: null,
+        upcoming_workouts: null,
+      };
+      result.featured_exercise = await get_random_exercise(option);
+      result.upcoming_workouts = await get_upcoming_created_workouts(userId);
+      return res.json({
+        status: 1,
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2351,4 +2450,5 @@ module.exports = {
   exercise_types_array,
   get_all_exercises,
   exercises,
+  featured_exercise,
 };

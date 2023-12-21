@@ -2425,6 +2425,21 @@ const delete_custom_exercise = async (req, res) => {
   }
 };
 
+const prebuild_videos_list = async (req, res) => {
+  try {
+    const result = await db("exercises")
+      .select("id", "title", "mobile_video")
+      .limit(4);
+
+    return res.json({
+      status: 1,
+      data: result,
+    });
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2489,4 +2504,5 @@ module.exports = {
   exercises,
   featured_exercise,
   delete_custom_exercise,
+  prebuild_videos_list,
 };

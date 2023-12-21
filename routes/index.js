@@ -243,4 +243,9 @@ router.post(
   validateDeleteCustomExercise,
   userController.delete_custom_exercise
 );
+router.post(
+  "/prebuild_videos_list",
+  multer().none(),
+  userController.prebuild_videos_list
+);
 module.exports = router;

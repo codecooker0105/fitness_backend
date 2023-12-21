@@ -26,6 +26,7 @@ const {
   validateRemoveTrainer,
   validateExercises,
   validateDeleteCustomExercise,
+  validateMakePriorityToVideo,
 } = require("../controllers/userController");
 
 router.post(
@@ -253,5 +254,11 @@ router.post(
   multer().none(),
   validateClients,
   userController.list_of_videos
+);
+router.post(
+  "/make_priority_to_video",
+  multer().none(),
+  validateMakePriorityToVideo,
+  userController.make_priority_to_video
 );
 module.exports = router;

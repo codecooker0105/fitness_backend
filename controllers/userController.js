@@ -190,6 +190,13 @@ const validateDeleteCustomExercise = [
   check("id").notEmpty().withMessage("Exercise ID is required."),
 ];
 
+const validateMakePriorityToVideo = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("mobile_video").notEmpty().withMessage("Mobile Video url is required."),
+  check("exercise_id").notEmpty().withMessage("Exercise ID is required."),
+  check("title").notEmpty().withMessage("Title is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -2449,13 +2456,73 @@ const list_of_videos = async (req, res) => {
 
     const userDetail = await getUserDetail(userId);
     if (userDetail && userDetail.group_id == 3) {
-      const exercise_videos = await db("exercises").select("id as exercise_id", "title", "mobile_video");
-      const additional_exercise_videos = await db("additional_exercise_videos")
-        .select("exercise_id", "title", "mobile_video")
+      const exercise_videos = await db("exercises").select(
+        "id as exercise_id",
+        "title",
+        "mobile_video"
+      );
+      const additional_exercise_videos = await db(
+        "additional_exercise_videos"
+      ).select("exercise_id", "title", "mobile_video");
       const result = [...exercise_videos, ...additional_exercise_videos];
       return res.json({
         status: 1,
         data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const make_priority_to_video = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const checkExerciseTable = await db("exercises")
+        .select("id as exercise_id", "title", "mobile_video")
+        .where("mobile_video", bodyData.mobile_video)
+        .where("id", bodyData.exercise_id);
+      await db("additional_exercise_videos")
+        .where("exercise_id", bodyData.exercise_id)
+        .where("trainer_id", userId)
+        .update({ priority: 0 });
+      if (!checkExerciseTable) {
+        const checkAdditionalExerciseTable = await db(
+          "additional_exercise_videos"
+        )
+          .where("mobile_video", bodyData.mobile_video)
+          .where("trainer_id", userId)
+          .where("exercise_id", bodyData.exercise_id)
+          .first();
+        if (checkAdditionalExerciseTable) {
+          await db("additional_exercise_videos")
+            .where("id", checkAdditionalExerciseTable.id)
+            .update({ priority: 1 });
+        } else {
+          const insertData = {
+            title: bodyData.title,
+            mobile_video: bodyData.mobile_video,
+            trainer_id: userId,
+            exercise_id: bodyData.exercise_id,
+            priority: 1
+          }
+          await db("additional_exercise_videos").insert(insertData);
+        }
+      }
+      return res.json({
+        status: 1,
+        message: "Video added for this exercise successfully.",
       });
     } else {
       return res.json({
@@ -2492,6 +2559,7 @@ module.exports = {
   validateRemoveTrainer,
   validateExercises,
   validateDeleteCustomExercise,
+  validateMakePriorityToVideo,
   getAllUsers,
   getUserById,
   register,
@@ -2534,4 +2602,5 @@ module.exports = {
   delete_custom_exercise,
   prebuild_videos_list,
   list_of_videos,
+  make_priority_to_video,
 };

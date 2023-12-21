@@ -25,6 +25,7 @@ const {
   validateRemoveClient,
   validateRemoveTrainer,
   validateExercises,
+  validateDeleteCustomExercise,
 } = require("../controllers/userController");
 
 router.post(
@@ -235,5 +236,11 @@ router.post(
   multer().none(),
   validateClients,
   userController.featured_exercise
+);
+router.post(
+  "/delete_custom_exercise",
+  multer().none(),
+  validateDeleteCustomExercise,
+  userController.delete_custom_exercise
 );
 module.exports = router;

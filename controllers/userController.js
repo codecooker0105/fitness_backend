@@ -185,6 +185,11 @@ const validateExercises = [
   check("section_id").notEmpty().withMessage("Section ID is required."),
 ];
 
+const validateDeleteCustomExercise = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("id").notEmpty().withMessage("Exercise ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -2381,6 +2386,37 @@ const featured_exercise = async (req, res) => {
     } else {
       return res.json({
         status: 0,
+        message: "Member does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const delete_custom_exercise = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      await db("exercises").where("id", bodyData.id).del();
+      const exercise_type_id = await db("exercise_link_types")
+        .select("type_id")
+        .where("exercise_id", bodyData.id)
+        .first();
+      await db("exercise_types").where("id", exercise_type_id.type_id).del();
+      await db("exercise_link_types").where("exercise_id", bodyData.id).del();
+      return res.json({
+        status: 1,
+        message: "Exercise deleted successfully.",
+      });
+    } else {
+      return res.json({
+        status: 0,
         message: "Trainer does not exist with given ID.",
       });
     }
@@ -2412,6 +2448,7 @@ module.exports = {
   validateRemoveClient,
   validateRemoveTrainer,
   validateExercises,
+  validateDeleteCustomExercise,
   getAllUsers,
   getUserById,
   register,
@@ -2451,4 +2488,5 @@ module.exports = {
   get_all_exercises,
   exercises,
   featured_exercise,
+  delete_custom_exercise,
 };

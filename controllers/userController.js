@@ -2440,6 +2440,34 @@ const prebuild_videos_list = async (req, res) => {
   }
 };
 
+const list_of_videos = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const exercise_videos = await db("exercises").select("id as exercise_id", "title", "mobile_video");
+      const additional_exercise_videos = await db("additional_exercise_videos")
+        .select("exercise_id", "title", "mobile_video")
+      const result = [...exercise_videos, ...additional_exercise_videos];
+      return res.json({
+        status: 1,
+        data: result,
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2505,4 +2533,5 @@ module.exports = {
   featured_exercise,
   delete_custom_exercise,
   prebuild_videos_list,
+  list_of_videos,
 };

@@ -248,4 +248,10 @@ router.post(
   multer().none(),
   userController.prebuild_videos_list
 );
+router.post(
+  "/list_of_videos",
+  multer().none(),
+  validateClients,
+  userController.list_of_videos
+);
 module.exports = router;

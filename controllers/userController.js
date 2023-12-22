@@ -928,6 +928,37 @@ const get_upcoming_created_workouts = async (user_id) => {
   }
 };
 
+const get_all_clients = async (userId, page, limit) => {
+  const trainer_removed = await db("trainer_removed_clients")
+    .where("trainer_id", userId)
+    .first();
+  ("SELECT `users`.`id` As user_id, `users`.`username`, `users`.`email`, IFNULL(`trainer_clients`.`status`, NULL) AS status, `meta`.`first_name`, `meta`.`last_name`, `meta`.`phone_number`, `meta`.`photo`, `meta`.`available_equipment` FROM (`users`) LEFT JOIN `trainer_clients` ON `users`.`id` = `trainer_clients`.`client_id` AND `trainer_clients`.`trainer_id` = 2 JOIN `meta` ON `users`.`id` = `meta`.`user_id` WHERE `users`.`group_id` = 2 AND `users`.`id` NOT IN (1,6) ORDER BY `users`.`created_on` desc LIMIT 10 OFFSET 0");
+  const result = await db("users")
+    .select(
+      "users.id as user_id",
+      "users.username",
+      "users.email",
+      "IFNULL(trainer_clients.status, NULL) as status",
+      "meta.first_name",
+      "meta.last_name",
+      "meta.phone_number",
+      "meta.available_equipment",
+      "meta.photo"
+    )
+    .join("trainer_clients", "users.id", "trainer_clients.client_id")
+    .join("meta", "users.id", "meta.user_id")
+    .where("users.group_id", 2)
+    .where("trainer_clients.trainer_id", userId)
+    .where((qb) => {
+      if (trainer_removed) {
+        qb.whereRaw("id NOT IN ('" + trainer_removed.removed_client_id + "')");
+      }
+    })
+    .orderBy("users.created_on", "desc")
+    .limit(limit, (page - 1) * limit);
+  return JSON.parse(JSON.stringify(result));
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -2515,8 +2546,8 @@ const make_priority_to_video = async (req, res) => {
             mobile_video: bodyData.mobile_video,
             trainer_id: userId,
             exercise_id: bodyData.exercise_id,
-            priority: 1
-          }
+            priority: 1,
+          };
           await db("additional_exercise_videos").insert(insertData);
         }
       }
@@ -2524,6 +2555,40 @@ const make_priority_to_video = async (req, res) => {
         status: 1,
         message: "Video added for this exercise successfully.",
       });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+const all_clients = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 3) {
+      const page = bodyData.page ? bodyData.page : 1;
+      const limit = bodyData.limit ? bodyData.limit : 10;
+      const result = await get_all_clients(userId, page, limit);
+      if (result) {
+        return res.json({
+          status: 1,
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No clients found",
+        });
+      }
     } else {
       return res.json({
         status: 0,
@@ -2603,4 +2668,5 @@ module.exports = {
   prebuild_videos_list,
   list_of_videos,
   make_priority_to_video,
+  all_clients,
 };

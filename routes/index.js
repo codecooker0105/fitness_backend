@@ -261,4 +261,10 @@ router.post(
   validateMakePriorityToVideo,
   userController.make_priority_to_video
 );
+router.post(
+  "/all_clients",
+  multer().none(),
+  validateClients,
+  userController.all_clients
+);
 module.exports = router;

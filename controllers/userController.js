@@ -932,7 +932,6 @@ const get_all_clients = async (userId, page, limit) => {
   const trainer_removed = await db("trainer_removed_clients")
     .where("trainer_id", userId)
     .first();
-  ("SELECT `users`.`id` As user_id, `users`.`username`, `users`.`email`, IFNULL(`trainer_clients`.`status`, NULL) AS status, `meta`.`first_name`, `meta`.`last_name`, `meta`.`phone_number`, `meta`.`photo`, `meta`.`available_equipment` FROM (`users`) LEFT JOIN `trainer_clients` ON `users`.`id` = `trainer_clients`.`client_id` AND `trainer_clients`.`trainer_id` = 2 JOIN `meta` ON `users`.`id` = `meta`.`user_id` WHERE `users`.`group_id` = 2 AND `users`.`id` NOT IN (1,6) ORDER BY `users`.`created_on` desc LIMIT 10 OFFSET 0");
   const result = await db("users")
     .select(
       "users.id as user_id",
@@ -956,6 +955,26 @@ const get_all_clients = async (userId, page, limit) => {
     })
     .orderBy("users.created_on", "desc")
     .limit(limit, (page - 1) * limit);
+  return JSON.parse(JSON.stringify(result));
+};
+
+const get_all_groups = async (userId, page, limit) => {
+  const result = await db("trainer_client_groups")
+    .where("trainer_id", userId)
+    .limit(limit, (page - 1) * limit);
+  for (let i = 0; i < result.length; i++) {
+    if (result[i].exp_level_id) {
+      result[i].exp_level_name = await db("experience_level")
+        .where("id", result[i].exp_level_id)
+        .first();
+    }
+    if (result[i].available_equipment) {
+      result[i].available_equipment_name = await db("equipment").whereIn(
+        "id",
+        result[i].available_equipment.split(",")
+      );
+    }
+  }
   return JSON.parse(JSON.stringify(result));
 };
 
@@ -2600,6 +2619,40 @@ const all_clients = async (req, res) => {
   }
 };
 
+const trainer_groups = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+
+    const userDetail = await getUserDetail(userId);
+    if (userDetail && userDetail.group_id == 2) {
+      const page = bodyData.page ? bodyData.page : 1;
+      const limit = bodyData.limit ? bodyData.limit : 10;
+      const result = await get_all_groups(userId, page, limit);
+      if (result) {
+        return res.json({
+          status: 1,
+          data: result,
+        });
+      } else {
+        return res.json({
+          status: 0,
+          message: "No clients found",
+        });
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2669,4 +2722,5 @@ module.exports = {
   list_of_videos,
   make_priority_to_video,
   all_clients,
+  trainer_groups,
 };

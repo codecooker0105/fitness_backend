@@ -267,4 +267,10 @@ router.post(
   validateClients,
   userController.all_clients
 );
+router.post(
+  "/trainer_groups",
+  multer().none(),
+  validateClients,
+  userController.trainer_groups
+);
 module.exports = router;

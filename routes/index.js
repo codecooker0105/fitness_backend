@@ -27,6 +27,7 @@ const {
   validateExercises,
   validateDeleteCustomExercise,
   validateMakePriorityToVideo,
+  validateFirstRun,
 } = require("../controllers/userController");
 
 router.post(
@@ -272,5 +273,11 @@ router.post(
   multer().none(),
   validateClients,
   userController.trainer_groups
+);
+router.post(
+  "/first_run",
+  multer().none(),
+  validateFirstRun,
+  userController.first_run
 );
 module.exports = router;

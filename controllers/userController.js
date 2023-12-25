@@ -192,9 +192,21 @@ const validateDeleteCustomExercise = [
 
 const validateMakePriorityToVideo = [
   check("user_id").notEmpty().withMessage("User ID is required."),
-  check("mobile_video").notEmpty().withMessage("Mobile Video url is required."),
+  check("mobile_video").notEmpty().withMessage("Mobile Video is required."),
   check("exercise_id").notEmpty().withMessage("Exercise ID is required."),
   check("title").notEmpty().withMessage("Title is required."),
+];
+
+const validateFirstRun = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("progression_plan_id")
+    .notEmpty()
+    .withMessage("Progression Plan is required."),
+  check("workoutdays").notEmpty().withMessage("Workout Days are required."),
+  check("exp_level_id").notEmpty().withMessage("Experience Level is required."),
+  check("available_equipment")
+    .notEmpty()
+    .withMessage("Available Equipment is required."),
 ];
 
 const getAllUsers = async (req, res) => {
@@ -978,6 +990,251 @@ const get_all_groups = async (userId, page, limit) => {
   return JSON.parse(JSON.stringify(result));
 };
 
+const assign_available_exercises = async (userId) => {
+  const userDetail = await getUserDetail(userId);
+  const available_exercise = await db("exercises").where(
+    "experience_id",
+    "<=",
+    userDetail.exp_level_id
+  );
+  await db("user_available_exercises").where("user_id", userId).del();
+  available_exercise.forEach(async (exercise) => {
+    const insertData = {
+      user_id: userId,
+      exercise_id: exercise.id,
+    };
+    await db("user_available_exercises").insert(insertData);
+  });
+};
+
+const get_exercise_counts = async (option) => {
+  const userSession = await db("user_progressions")
+    .where("user_id", option.user_id)
+    .where("progression_id", option.progression_id)
+    .first();
+  let sessionDays = null;
+  if (userSession) {
+    sessionDays = await db("progression_sessions")
+      .where("progression_id", option.progression_id)
+      .where("day", "<=", userSession.session_count)
+      .orderBy("day", "asc");
+  } else {
+    const insertData = {
+      user_id: userId,
+      progression_id: option.progression_id,
+      session_count: 1,
+    };
+    await db("user_progressions").insert(insertData);
+    sessionDays = await db("progression_sessions")
+      .where("progression_id", option.progression_id)
+      .where("day", "<=", 1)
+      .orderBy("day", "asc");
+  }
+
+  const progression = await db("progressions")
+    .where("id", option.progression_id)
+    .first();
+  const returnData = {
+    sets: progression.default_sets,
+    reps: progression.default_reps,
+    time: progression.default_time,
+    rest: progression.default_rest,
+    weight: "",
+    weight_option: "weighted",
+  };
+  return JSON.parse(JSON.stringify(returnData));
+};
+
+const create_next_workout = async (userId) => {
+  const userDetail = await getUserDetail(userId);
+  const prevWorkout = await db("user_workouts")
+    .where("progression_plan_id", userDetail.progression_plan_id)
+    .where("user_id", userId)
+    .where("completed", "true")
+    .whereRaw("workout_date <= CURDATE()")
+    .orderBy("workout_date", "desc")
+    .first();
+  let nextWorkout = null;
+  if (prevWorkout) {
+    nextWorkout = await db("user_workouts")
+      .where("progression_plan_id", userDetail.progression_plan_id)
+      .where("user_id", userId)
+      .where("completed", "false")
+      .where("workout_date", ">=", prevWorkout.workout_date)
+      .orderBy("workout_date", "asc")
+      .first();
+  } else {
+    nextWorkout = await db("user_workouts")
+      .where("progression_plan_id", userDetail.progression_plan_id)
+      .where("user_id", userId)
+      .where("completed", "false")
+      .whereRaw("workout_date <= CURDATE()")
+      .orderBy("workout_date", "asc")
+      .first();
+  }
+  if (nextWorkout && nextWorkout.completed == "false") {
+    const progression = await db("progression_plan_days")
+      .select("progression.*")
+      .join(
+        "progressions",
+        "progressions.id",
+        "progression_plan_days.progression_id"
+      )
+      .where("day", userDetail.progression_plan_day)
+      .where("plan_id", userDetail.progression_plan_id)
+      .first();
+    const updateData = {
+      progression_id: progression.id,
+    };
+    await db("user_workouts").where("id", nextWorkout.id).update(updateData);
+    const hybridWorkout = await db("skeleton_workouts")
+      .select("skeleton_workouts.*")
+      .join(
+        "skeleton_focus",
+        "skeleton_focus.skeleton_id",
+        "skeleton_workouts.id"
+      )
+      .where("skeleton_focus.progression_id", progression.id)
+      .orderBy("skeleton_workouts.id")
+      .first();
+    const hybridWorkoutSections = await db("skeleton_section")
+      .select([
+        "skeleton_section_types.title",
+        "skeleton_section_types.type",
+        "skeleton_section.*",
+      ])
+      .join(
+        "skeleton_section_types",
+        "skeleton_section_types.id",
+        "skeleton_section.section_type_id"
+      )
+      .where("skeleton_id", hybridWorkout.id)
+      .orderBy("display_order");
+    let sectionCount = 1;
+    await db("user_workout_sections").where("workout_id", nextWorkout.id);
+    await db("user_workout_exercises").where("workout_id", nextWorkout.id);
+    hybridWorkoutSections.forEach(async (section) => {
+      const sectionData = {
+        workout_id: nextWorkout.id,
+        section_type_id: section.section_type_id,
+        display_order: sectionCount++,
+      };
+      const insertId = await db("user_workout_sections").insert(sectionData, [
+        "id",
+      ]);
+      const hybridWorkoutExerciseTypes = await db("skeleton_category")
+        .select("exercise_types.title", "skeleton_category.*")
+        .join(
+          "exercise_types",
+          "exercise_types.id",
+          "skeleton_category.exercise_type_id"
+        )
+        .where("section_id", section.id)
+        .orderBy("display_order");
+      let exerciseCount = 1;
+      hybridWorkoutExerciseTypes.forEach(async (category) => {
+        const randomOption = {
+          user_id: userId,
+          available_equipment: userDetail.available_equipment,
+          exercise_type: category.exercise_type_id,
+        };
+        const exercise = await get_random_exercise(randomOption);
+        const exerciseData = {
+          sets: "",
+          reps: "",
+          time: "",
+          rest: "",
+          weight: "",
+          weight_option: "",
+          workout_id: nextWorkout.id,
+          exercise_id: "NULL",
+          workout_section_id: insertId,
+          exercise_type_id: category.exercise_type_id,
+          display_order: exerciseCount++,
+        };
+        if (exercise) {
+          const countOption = {
+            user_id: userId,
+            progression_id: progression.id,
+            exercise_id: exercise.id,
+            weight_type: exercise.weight_type,
+            section_type: section.type,
+          };
+          const exerciseState = await get_exercise_counts(countOption);
+          exerciseData.sets = exerciseState.sets;
+          exerciseData.reps = exerciseState.reps;
+          exerciseData.time = exerciseState.time;
+          exerciseData.rest = exerciseState.rest;
+          exerciseData.weight = exerciseState.weight;
+          exerciseData.weight_option = exerciseState.weight_option;
+          exerciseData.exercise_id = exercise.id;
+        } else {
+          const countOption = {
+            user_id: userId,
+            progression_id: progression.id,
+            section_type: section.type,
+          };
+          const exerciseState = await get_exercise_counts(countOption);
+          exerciseData.sets = exerciseState.sets;
+          exerciseData.reps = exerciseState.reps;
+          exerciseData.time = exerciseState.time;
+          exerciseData.rest = exerciseState.rest;
+          exerciseData.weight = exerciseState.weight;
+          exerciseData.weight_option = exerciseState.weight_option;
+        }
+        await db("user_workout_exercises").insert(exerciseData);
+      });
+    });
+    await db("user_workouts")
+      .where("id", nextWorkout.id)
+      .where("user_id", userId)
+      .update({ workout_created: "true", title: hybridWorkout.title });
+    return nextWorkout.id;
+  } else {
+    return false;
+  }
+};
+
+const progression_change_workouts = async (userId) => {
+  const existingWorkouts = await db("user_workouts")
+    .whereRaw("workout_date >= CURDATE()")
+    .whereRaw("progression_plan_id IS NOT NULL")
+    .where("user_id", userId)
+    .where("completed", "false");
+  existingWorkouts.forEach(async (workout) => {
+    await db("user_workout_exercises").where("workout_id", workout.id).del();
+    await db("user_workout_sections").where("workout_id", workout.id).del();
+    await db("user_workouts").where("id", workout.id).del();
+  });
+  const userDetail = await getUserDetail(userId);
+  const weekdays = userDetail.workoutdays.split(",");
+
+  weekdays.forEach(async (day) => {
+    let currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+
+    while (currentDate.getDay() !== Number(day)) {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const endDate = new Date(currentDate);
+    endDate.setDate(endDate.getDate() + 90);
+
+    while (currentDate < endDate) {
+      const workoutDate = currentDate.toISOString().split("T")[0];
+      const workoutValues = {
+        user_id: user.user_id,
+        workout_date: workoutDate,
+        progression_plan_id: user.progression_plan_id,
+      };
+      await db("user_workouts").insert(workoutValues);
+
+      currentDate.setDate(currentDate.getDate() + 7);
+    }
+  });
+  await create_next_workout(userId);
+};
+
 const register = async (req, res) => {
   await validateHandle(req, res);
 
@@ -1690,7 +1947,7 @@ const edit_progression_plan = async (req, res) => {
       workoutdays: bodyData.workoutdays,
     };
     await db("meta").where("user_id", userDetail.id).update(updateData);
-    // need to add progression change
+    await progression_change_workouts(userId);
     return res.json({
       status: 1,
       message: "Progression Plan updated successfully.",
@@ -1860,7 +2117,7 @@ const log_book = async (req, res) => {
           }
         });
 
-        workout.uwe = btoa(JSON.stringify(uwe)); // Encode to base64
+        workout.uwe = btoa(JSON.stringify(uwe));
       }
       return res.json({
         status: 1,
@@ -2653,6 +2910,43 @@ const trainer_groups = async (req, res) => {
   }
 };
 
+const first_run = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    if (bodyData.progression_plan_id) {
+      const progression_plan = await db("progression_plans")
+        .where("id", bodyData.progression_plan_id)
+        .first();
+      const workoutdays = bodyData.workoutdays.split(",");
+      if (progression_plan.days_week != workoutdays.length) {
+        return res.json({
+          status: 0,
+          message:
+            "You must select " +
+            progression_plan.days_week +
+            " days a week for the " +
+            progression_plan.title +
+            " Plan.",
+        });
+      }
+      const updateData = {
+        progression_plan_id: bodyData.progression_plan_id,
+        workoutdays: bodyData.workoutdays,
+        exp_level_id: bodyData.exp_level_id,
+        available_equipment: bodyData.available_equipment,
+      };
+      await db("meta").where("user_id", userDetail.id).update(updateData);
+      await assign_available_exercises(userId);
+      await progression_change_workouts(userId);
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2678,6 +2972,7 @@ module.exports = {
   validateExercises,
   validateDeleteCustomExercise,
   validateMakePriorityToVideo,
+  validateFirstRun,
   getAllUsers,
   getUserById,
   register,
@@ -2723,4 +3018,5 @@ module.exports = {
   make_priority_to_video,
   all_clients,
   trainer_groups,
+  first_run,
 };

@@ -28,6 +28,7 @@ const {
   validateDeleteCustomExercise,
   validateMakePriorityToVideo,
   validateFirstRun,
+  validateSaveLogbookStats,
 } = require("../controllers/userController");
 
 router.post(
@@ -279,5 +280,11 @@ router.post(
   multer().none(),
   validateFirstRun,
   userController.first_run
+);
+router.post(
+  "/save_logbook_stats",
+  multer().none(),
+  validateSaveLogbookStats,
+  userController.save_logbook_stats
 );
 module.exports = router;

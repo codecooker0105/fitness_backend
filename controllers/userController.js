@@ -209,6 +209,12 @@ const validateFirstRun = [
     .withMessage("Available Equipment is required."),
 ];
 
+const validateSaveLogbookStats = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("workout_date").notEmpty().withMessage("Workout date is required."),
+  check("workout_id").notEmpty().withMessage("Workout ID is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -2947,6 +2953,91 @@ const first_run = async (req, res) => {
   }
 };
 
+const save_logbook_stats = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userWorkout = await db("user_workouts")
+      .where("id", bodyData.workout_id)
+      .where("user_id", userId)
+      .first();
+    if (userWorkout) {
+      const userWorkoutExercises = JSON.parse(atob(bodyData.uwe));
+      userWorkoutExercises.forEach(async (uwe) => {
+        await db("user_workout_stats")
+          .where("user_id", userId)
+          .where("uw_id", bodyData.workout_id)
+          .where("uwe_id", uwe.id)
+          .del();
+        const uweRow = await db("user_workout_exercises")
+          .where("workout_id", bodyData.workout_id)
+          .where("id", uwe.uwe_id)
+          .first();
+        if (uweRow) {
+          uwe.sets.forEach(async (set, key) => {
+            const insertData = {
+              uw_id: bodyData.workout_id,
+              uwe_id: uwe.uwe_id,
+              workout_date: bodyData.workout_date,
+              user_id: userId,
+              progression_id: uweRow.progression_id,
+              exercise_id: uweRow.exercise_id,
+              difficulty: uwe.difficulty,
+              set: set,
+            };
+            insertData.reps = uwe.reps[key] ? uwe.reps[key] : "NULL";
+            insertData.time = uwe.time[key] ? uwe.time[key] : "NULL";
+            insertData.weight = uwe.weight[key] ? uwe.weight[key] : "NULL";
+            await db("user_workout_stats").insert(insertData);
+          });
+        }
+      });
+      if (userWorkout.completed != "true" && userWorkout.progression_id != "") {
+        const currentProgression = await db("user_progressions")
+          .where("progression_id", userWorkout.progression_id)
+          .where("user_id", userid)
+          .first();
+        if (currentProgression) {
+          await db("user_progressions")
+            .where("progression_id", userWorkout.progression_id)
+            .where("user_id", userId)
+            .update({ session_count: currentProgression.session_count + 1 });
+        } else {
+          const insertData = {
+            progression_id: userWorkout.progression_id,
+            user_id: userId,
+            session_count: 1,
+          };
+          await db("user_progressions").insert(insertData);
+        }
+      }
+      await db("user_workouts")
+        .where("id", bodyData.workout_id)
+        .where("user_id", userId)
+        .update({
+          completed: "true",
+        });
+      if (userWorkout.progression_id != "") {
+        await create_next_workout(userId);
+      }
+      return res.json({
+        status: 1,
+        message:
+          "Your workout stats have been saved and your next workout has been generated based on these stats.",
+      });
+    } else {
+      return res.json({
+        status: 0,
+        message: "Your workout stats failed to save.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -2973,6 +3064,7 @@ module.exports = {
   validateDeleteCustomExercise,
   validateMakePriorityToVideo,
   validateFirstRun,
+  validateSaveLogbookStats,
   getAllUsers,
   getUserById,
   register,
@@ -3019,4 +3111,5 @@ module.exports = {
   all_clients,
   trainer_groups,
   first_run,
+  save_logbook_stats,
 };

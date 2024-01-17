@@ -215,6 +215,12 @@ const validateSaveLogbookStats = [
   check("workout_id").notEmpty().withMessage("Workout ID is required."),
 ];
 
+const validateRequestClient = [
+  check("user_id").notEmpty().withMessage("User ID is required."),
+  check("name").notEmpty().withMessage("Name is required."),
+  check("email").notEmpty().withMessage("Email is required."),
+];
+
 const getAllUsers = async (req, res) => {
   try {
     const users = await db("users");
@@ -3038,6 +3044,50 @@ const save_logbook_stats = async (req, res) => {
   }
 };
 
+const request_client = async (req, res) => {
+  await validateHandle(req, res);
+
+  try {
+    const bodyData = JSON.parse(JSON.stringify(req.body));
+    const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
+
+    if (userDetail && userDetail.group_id == 3) {
+      const currentClients = await db("trainer_clients")
+        .where("email", bodyData.email)
+        .where("trainer_id", userId)
+        .first();
+      if (currentClients) {
+        if (currentClients.status == "denied") {
+          await db("trainer_clients").where("id", currentClients.id).update({
+            status: "requested",
+          });
+        } else {
+          return res.json({
+            status: 0,
+            message: "You have already requested to train this client.",
+          });
+        }
+      } else {
+        const insertData = {
+          name: bodyData.name,
+          trainer_id: userId,
+          email: bodyData.email,
+          email_message: bodyData.email_message,
+        };
+        await db("trainer_client").insert(insertData);
+      }
+    } else {
+      return res.json({
+        status: 0,
+        message: "Trainer does not exist with given ID.",
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -3065,6 +3115,7 @@ module.exports = {
   validateMakePriorityToVideo,
   validateFirstRun,
   validateSaveLogbookStats,
+  validateRequestClient,
   getAllUsers,
   getUserById,
   register,
@@ -3112,4 +3163,5 @@ module.exports = {
   trainer_groups,
   first_run,
   save_logbook_stats,
+  request_client,
 };

@@ -29,6 +29,7 @@ const {
   validateMakePriorityToVideo,
   validateFirstRun,
   validateSaveLogbookStats,
+  validateRequestClient,
 } = require("../controllers/userController");
 
 router.post(
@@ -286,5 +287,11 @@ router.post(
   multer().none(),
   validateSaveLogbookStats,
   userController.save_logbook_stats
+);
+router.post(
+  "/request_client",
+  multer().none(),
+  validateRequestClient,
+  userController.request_client
 );
 module.exports = router;

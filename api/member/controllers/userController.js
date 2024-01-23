@@ -2060,11 +2060,12 @@ const log_book = async (req, res) => {
   try {
     const bodyData = JSON.parse(JSON.stringify(req.body));
     const userId = bodyData.user_id;
+    const userDetail = await getUserDetail(userId);
 
     const now = new Date();
     const date = bodyData.date
       ? bodyData.date
-      : now.getFullYear + "-" + (now.getMonth + 1) + "-" + now.getDate();
+      : now.getFullYear() + "-" + (now.getMonth() + 1) + "-" + now.getDate();
     const workout = bodyData.workout_id
       ? get_logbook_workout(userId, "", bodyData.workout_id)
       : get_logbook_workout(userId, date, bodyData.workout_id);
@@ -2072,10 +2073,10 @@ const log_book = async (req, res) => {
       const updateDeviceData = {
         device_token: bodyData?.device_token
           ? bodyData.device_token
-          : user.device_token,
+          : userDetail.device_token,
         device_type: bodyData?.device_type
           ? bodyData.device_type
-          : user.device_type,
+          : userDetail.device_type,
       };
       await updateDevice(userId, updateDeviceData);
       let uwe = {};

@@ -112,7 +112,6 @@ const validateAddFeaturedExerciseToWorkout = [
 
 const validateGetSimiliarWorkoutExercise = [
   check("user_id").notEmpty().withMessage("User ID is required."),
-  check("exercise").notEmpty().withMessage("Exercise is required."),
   check("workout_id").notEmpty().withMessage("Workout ID is required."),
 ];
 
@@ -1608,7 +1607,7 @@ const add_featured_exercise_to_workout = async (req, res) => {
             .where("id", bodyData.exercise)
             .first();
           const currentSectionExercise = await db("user_workout_exercises")
-            .order_by("display_order", "desc")
+            .orderBy("display_order", "desc")
             .where("workout_section_id", uwsId)
             .first();
           if (currentSectionExercise) {
@@ -1638,7 +1637,7 @@ const add_featured_exercise_to_workout = async (req, res) => {
             .where("id", bodyData.exercise)
             .first();
           const currentSectionExercise = await db("user_workout_exercises")
-            .order_by("display_order", "desc")
+            .orderBy("display_order", "desc")
             .where("id", uweId)
             .first();
           if (currentSectionExercise) {
@@ -1692,7 +1691,7 @@ const get_similiar_workout_exercises = async (req, res) => {
           "user_workout_sections.section_type_id = skeleton_section_types.id"
         )
         .where("user_workout_sections.workout_id", bodyData.workout_id)
-        .order_by("display_order", "asc");
+        .orderBy("display_order", "asc");
       return res.json({
         status: 1,
         data: result,

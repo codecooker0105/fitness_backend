@@ -1269,6 +1269,7 @@ const register = async (req, res) => {
     newUserData.username = userData.email;
     newUserData.password = await bcrypt.hash(userData.password, 10);
     newUserData.active = 1;
+    newUserData.ip_address = "0.0.0.0";
     newUserData.created_on = Math.floor(Date.now() / 1000);
     newUserData.last_login = Math.floor(Date.now() / 1000);
     const newUserId = await db("users").insert(newUserData, ["id"]);

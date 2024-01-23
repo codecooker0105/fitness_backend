@@ -598,7 +598,7 @@ const get_logbook_workout = async (userId, date, workout_id) => {
         "user_workout_sections.section_type_id"
       )
       .where("workout_id", workout_id)
-      .orderBy("display_order", "asc");
+      .orderBy("display_order");
     workout_sections.forEach(async (section) => {
       return_workout.sections[section.display_order] = {
         title: section.title,
@@ -622,7 +622,7 @@ const get_logbook_workout = async (userId, date, workout_id) => {
         .join("exercises", "exercises.id", "user_workout_exercises.exercise_id")
         .where("workout_id", workout_id)
         .where("workout_section_id", section.id)
-        .orderBy("display_order", "asc");
+        .orderBy("display_order");
       workout_exercises.forEach(async (exercise) => {
         return_workout.sections[section.display_order].exercises[
           exercise.display_order
@@ -814,7 +814,7 @@ const get_skeleton_generator = async (option) => {
     .where("skeleton_id", option.id);
   result.skeleton_section_types = await db("skeleton_section_types").select();
   result.exercise_types = await db("exercise_types")
-    .orderBy("title", "asc")
+    .orderBy("title")
     .select();
   return JSON.parse(JSON.stringify(result));
 };
@@ -857,7 +857,7 @@ const get_exercises = async (options, page, limit) => {
         qb.orWhere("experience_id", options.experience_level);
       }
     })
-    .orderBy("title", "asc")
+    .orderBy("title")
     .limit(limit, (page - 1) * limit);
   return JSON.parse(JSON.stringify(result));
 };
@@ -917,7 +917,7 @@ const get_random_exercise = async (options) => {
         );
       }
     })
-    .orderBy("title", "asc")
+    .orderBy("title")
     .limit(limit, (page - 1) * limit);
   return JSON.parse(JSON.stringify(result));
 };
@@ -929,7 +929,7 @@ const get_upcoming_created_workouts = async (user_id) => {
     .where("completed", "false")
     .where("workout_created", "true")
     .where("workout_date", ">=", getFormattedDate())
-    .orderBy("workout_date", "asc")
+    .orderBy("workout_date")
     .orderBy("id", "desc")
     .groupBy("user_workouts.workout_date");
   const workoutIdsArray = upcomingWorkoutIds.map((workout) => workout.id);
@@ -942,7 +942,7 @@ const get_upcoming_created_workouts = async (user_id) => {
         "user_workouts.workout_date"
       )
       .whereIn("id", workoutIdsArray)
-      .orderBy("workout_date", "asc");
+      .orderBy("workout_date");
   }
   if (result) {
     return JSON.parse(JSON.stringify(result));
@@ -1028,7 +1028,7 @@ const get_exercise_counts = async (option) => {
     sessionDays = await db("progression_sessions")
       .where("progression_id", option.progression_id)
       .where("day", "<=", userSession.session_count)
-      .orderBy("day", "asc");
+      .orderBy("day");
   } else {
     const insertData = {
       user_id: userId,
@@ -1039,7 +1039,7 @@ const get_exercise_counts = async (option) => {
     sessionDays = await db("progression_sessions")
       .where("progression_id", option.progression_id)
       .where("day", "<=", 1)
-      .orderBy("day", "asc");
+      .orderBy("day");
   }
 
   const progression = await db("progressions")
@@ -1072,7 +1072,7 @@ const create_next_workout = async (userId) => {
       .where("user_id", userId)
       .where("completed", "false")
       .where("workout_date", ">=", prevWorkout.workout_date)
-      .orderBy("workout_date", "asc")
+      .orderBy("workout_date")
       .first();
   } else {
     nextWorkout = await db("user_workouts")
@@ -1080,7 +1080,7 @@ const create_next_workout = async (userId) => {
       .where("user_id", userId)
       .where("completed", "false")
       .whereRaw("workout_date <= CURDATE()")
-      .orderBy("workout_date", "asc")
+      .orderBy("workout_date")
       .first();
   }
   if (nextWorkout && nextWorkout.completed == "false") {
@@ -1600,9 +1600,9 @@ const add_featured_exercise_to_workout = async (req, res) => {
         if (uwsId) {
           const exercise = await db("exercises")
             .join(
-              "exercise_link_types elt",
-              "elt.exercise_id = exercises.id",
-              "left"
+              "exercise_link_types",
+              "exercise_link_types.exercise_id",
+              "exercises.id"
             )
             .where("id", bodyData.exercise)
             .first();
@@ -1630,9 +1630,9 @@ const add_featured_exercise_to_workout = async (req, res) => {
         if (uweId) {
           const exercise = await db("exercises")
             .join(
-              "exercise_link_types elt",
-              "elt.exercise_id = exercises.id",
-              "left"
+              "exercise_link_types",
+              "exercise_link_types.exercise_id",
+              "exercises.id"
             )
             .where("id", bodyData.exercise)
             .first();
@@ -1688,10 +1688,11 @@ const get_similiar_workout_exercises = async (req, res) => {
         )
         .join(
           "skeleton_section_types",
-          "user_workout_sections.section_type_id = skeleton_section_types.id"
+          "user_workout_sections.section_type_id",
+          "skeleton_section_types.id"
         )
         .where("user_workout_sections.workout_id", bodyData.workout_id)
-        .orderBy("display_order", "asc");
+        .orderBy("display_order");
       return res.json({
         status: 1,
         data: result,
@@ -2599,7 +2600,7 @@ const skeleton_section_types_array = async (req, res) => {
 
 const exercise_types_array = async (req, res) => {
   try {
-    const result = await db("exercise_types").orderBy("title", "asc").select();
+    const result = await db("exercise_types").orderBy("title").select();
     if (result) {
       return res.json({
         status: 1,
